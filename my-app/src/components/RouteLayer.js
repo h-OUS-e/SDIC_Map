@@ -7,7 +7,8 @@ export default function RouteLayer({
   map,
   url, // optional: URL to a .geojson file
   sourceId = 'saved-route',
-  layerId = 'saved-route-line'
+  layerId = 'saved-route-line',
+  opacity = 0.3 //  transparency (0.0 = invisible, 1.0 = solid)
 }) {
   const [geojson, setGeojson] = useState(null);
 
@@ -43,14 +44,14 @@ export default function RouteLayer({
         type: 'line',
         source: sourceId,
         paint: {
-          'line-color': '#FFD166',
-          'line-width': 4,
-          'line-opacity': 0.9
+          'line-color': '#3838f2',
+          'line-width': 5,
+          'line-opacity': 0.3
         }
       });
     } else {
-      const src = map.getSource(sourceId);
-      if (src && src.setData) src.setData(fc);
+        const src = map.getSource(sourceId);
+        if (src && src.setData) src.setData(fc);
     }
 
     // Fit to bounds

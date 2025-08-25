@@ -29,6 +29,24 @@ interface RouteFeature extends GeoJSON.Feature<GeoJSON.LineString> {
   };
 }
 
+// type Pair = { from: string; to: string };
+type Pair = {
+  from: string;
+  to: string;
+  profile: "driving" | "cycling" | "walking";
+
+  // metadata fields (all optional; filled if present in CSV)
+  month?: string;
+  class?: string;
+  team?: string;
+  location_name?: string;
+  activity?: string;
+
+  // Always keep the original raw strings
+  original_from?: string;
+  original_to?: string;
+};
+
 // ---- Config
 const MAPTILER_KEY =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MAPTILER_KEY) || "ZAMOU7NPssEmiSXsELqD"; 
@@ -48,29 +66,70 @@ async function geocodeMapTiler(query: string, apiKey: string): Promise<Coord> {
   return { lon: feat.center[0], lat: feat.center[1], name: feat.place_name || query };
 }
 
-async function routeOSRM(
-  a: Coord,
-  b: Coord,
-  profile: "driving" | "cycling" | "walking" = DEFAULT_PROFILE
-): Promise<RouteFeature> {
-  // OSRM expects lon,lat;lon,lat and returns GeoJSON with geometries=geojson
+// async function routeOSRM(
+//   a: Coord,
+//   b: Coord,
+//   profile: "driving" | "cycling" | "walking" = DEFAULT_PROFILE
+// ): Promise<RouteFeature> {
+//   // OSRM expects lon,lat;lon,lat and returns GeoJSON with geometries=geojson
+//   const base = "https://router.project-osrm.org/route/v1";
+//   const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
+//   const res = await fetch(url);
+//   if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
+//   const data = await res.json();
+//   const r = data?.routes?.[0];
+//   if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
+//   return {
+//     type: "Feature",
+//     properties: {
+//       distance_m: r.distance,
+//       duration_s: r.duration,
+//       from: a.name || "from",
+//       to: b.name || "to",
+//       profile,
+//     },
+//     geometry: r.geometry, // GeoJSON LineString in [lon, lat]
+//   };
+// }
+
+function haversineMeters([lon1, lat1]: number[], [lon2, lat2]: number[]) {
+  const R = 6371000;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function routeOSRMWithTail(a: Coord, b: Coord, profile: "driving"|"cycling"|"walking"): Promise<RouteFeature> {
   const base = "https://router.project-osrm.org/route/v1";
-  const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
+  const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false&approaches=unrestricted;curb`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
   const data = await res.json();
   const r = data?.routes?.[0];
   if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
+
+  const geom = r.geometry as GeoJSON.LineString;
+  const coords = geom.coordinates.slice();
+  const last = coords[coords.length - 1];
+  const tail = [b.lon, b.lat] as [number, number];
+
+  // append a short “last meters to door” segment
+  coords.push(tail);
+  const extra = haversineMeters(last, tail);
+
   return {
     type: "Feature",
     properties: {
-      distance_m: r.distance,
-      duration_s: r.duration,
+      distance_m: r.distance + extra,
+      duration_s: r.duration,               // keep car time; (see option 3 to model walking time)
       from: a.name || "from",
       to: b.name || "to",
       profile,
     },
-    geometry: r.geometry, // GeoJSON LineString in [lon, lat]
+    geometry: { type: "LineString", coordinates: coords },
   };
 }
 
@@ -92,22 +151,7 @@ function sleep(ms: number) {
 // 1) Pairwise rows:   from,to
 // 2) Sequential list: address (routes will be built between consecutive rows)
 
-// type Pair = { from: string; to: string };
-type Pair = {
-  from: string;
-  to: string;
 
-  // metadata fields (all optional; filled if present in CSV)
-  month?: string;
-  class?: string;
-  team?: string;
-  location_name?: string;
-  activity?: string;
-
-  // Always keep the original raw strings
-  original_from?: string;
-  original_to?: string;
-};
 
 
 function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
@@ -142,10 +186,12 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
           const row = normKeys(r);
           const from = asString(row["from"]);
           const to = asString(row["to"]);
+          const profile : "driving" | "cycling" | "walking"= row["profile"].trim();
           if (!from || !to) return null;
           const pair: Pair = {
             from,
             to,
+            profile,
             original_from: from,
             original_to: to,
             month: asString(row["month"]),
@@ -159,18 +205,19 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
         .filter(Boolean) as Pair[];
     }
 
-    if (hasAddress) {
-      const list: string[] = rows.map((r) => {
-        const row = normKeys(r);
-        return asString(row["address"] ?? row["addresses"]);
-      }).filter(Boolean) as string[];
-      return list.slice(0, -1).map((addr, i) => ({
-        from: addr,
-        to: list[i + 1],
-        original_from: addr,
-        original_to: list[i + 1],
-      }));
-    }
+    // if (hasAddress) {
+    //   const list: string[] = rows.map((r) => {
+    //     const row = normKeys(r);
+    //     return asString(row["address"] ?? row["addresses"]);
+    //   }).filter(Boolean) as string[];
+    //   return list.slice(0, -1).map((addr, i) => ({
+    //     from: addr,
+    //     to: list[i + 1],
+    //     profile: row["profile"],
+    //     original_from: addr,
+    //     original_to: list[i + 1],
+    //   }));
+    // }
 
     // Fallback: try first two columns as from/to
     return rows
@@ -178,8 +225,9 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
         const cols = Object.values(r);
         const from = asString(cols[0]);
         const to = asString(cols[1]);
+        const profile : "driving" | "cycling" | "walking"= cols[-1];
         if (!from || !to) return null;
-        const pair: Pair = { from, to, original_from: from, original_to: to };
+        const pair: Pair = { from, to, profile, original_from: from, original_to: to };
         return pair;
       })
       .filter(Boolean) as Pair[];
@@ -191,7 +239,8 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
       return arrRows.map((r) => {
         const from = String(r[0]).trim();
         const to = String(r[1]).trim();
-        const pair: Pair = { from, to, original_from: from, original_to: to };
+        const profile = String(r[-1]).trim();
+        const pair: Pair = { from, to, profile, original_from: from, original_to: to };
         return pair;
       });
     }
@@ -200,6 +249,7 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
     return list.slice(0, -1).map((addr, i) => ({
       from: addr,
       to: list[i + 1],
+      profile: DEFAULT_PROFILE,
       original_from: addr,
       original_to: list[i + 1],
     }));
@@ -210,7 +260,6 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
 // ---- Page Component
 export default function Page() {
   const [file, setFile] = useState<File | null>(null);
-  const [profile, setProfile] = useState<"driving" | "cycling" | "walking">(DEFAULT_PROFILE);
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -279,13 +328,13 @@ export default function Page() {
 
     for (let i = 0; i < pairs.length; i++) {
       const pair = pairs[i];
-      const { from, to } = pair;
+      const { from, to, profile } = pair;
       try {
         const [a, b] = await Promise.all([
           cache.get(from) || geocodeMapTiler(from, MAPTILER_KEY).then((c) => (cache.set(from, c), c)),
           cache.get(to) || geocodeMapTiler(to, MAPTILER_KEY).then((c) => (cache.set(to, c), c)),
         ]);
-        const feat = await routeOSRM(a, b, profile);
+        const feat = await routeOSRMWithTail(a, b, profile);
         
 
         // add metadata to properties
@@ -341,11 +390,6 @@ export default function Page() {
         </div>
         <div>
           <label style={{ marginRight: 8 }}>Profile:</label>
-          <select value={profile} onChange={(e) => setProfile(e.target.value as any)}>
-            <option value="driving">driving</option>
-            <option value="cycling">cycling</option>
-            <option value="walking">walking</option>
-          </select>
         </div>
       </section>
 

@@ -36,6 +36,47 @@ async function routeOSRM(a, b, profile = 'driving') {
   };
 }
 
+function haversineMeters([lon1, lat1], [lon2, lat2]) {
+  const R = 6371000;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function routeOSRMWithTail(a, b, profile = "walking") {
+  const base = "https://router.project-osrm.org/route/v1";
+  const url = `${base}/${"profile"}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
+  const data = await res.json();
+  const r = data?.routes?.[0];
+  if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
+
+  const geom = r.geometry;
+  const coords = geom.coordinates.slice();
+  const last = coords[coords.length - 1];
+  const tail = [b.lon, b.lat] ;
+
+  // append a short “last meters to door” segment
+  coords.push(tail);
+  const extra = haversineMeters(last, tail);
+
+  return {
+    type: "Feature",
+    properties: {
+      distance_m: r.distance + extra,
+      duration_s: r.duration,               // keep car time; (see option 3 to model walking time)
+      from: a.name || "from",
+      to: b.name || "to",
+      profile,
+    },
+    geometry: { type: "LineString", coordinates: coords },
+  };
+}
+
 function downloadJSON(obj, filename = 'route.geojson') {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/geo+json' });
   const a = document.createElement('a');
@@ -96,7 +137,7 @@ export default function RouteGenerator({
       setErr(null);
       setLoading(true);
       const [p1, p2] = await Promise.all([geocode(from, apiKey), geocode(to, apiKey)]);
-      const feat = await routeOSRM(p1, p2, profile);
+      const feat = await routeOSRMWithTail(p1, p2, profile);
       setRouteFeature(feat);
       // Immediately render on the map
       addOrUpdateLayer(feat);

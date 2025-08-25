@@ -167,7 +167,7 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     <RouteLayer map={map.current} />
-                    {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
+                    <RouteGenerator map={map.current} apiKey={API_KEY} />
                 </>                 
             )}
         </div>

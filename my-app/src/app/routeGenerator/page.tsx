@@ -17,9 +17,17 @@ interface RouteFeature extends GeoJSON.Feature<GeoJSON.LineString> {
     from: string;
     to: string;
     profile: "driving" | "cycling" | "walking";
+
+    // original metadata fields from csv file
+    month?: string;
+    class?: string;
+    team?: string;
+    original_from?: string;
+    original_to?: string;
+    location_name?: string;
+    activity?: string;
   };
 }
-
 
 // ---- Config
 const MAPTILER_KEY =
@@ -84,7 +92,23 @@ function sleep(ms: number) {
 // 1) Pairwise rows:   from,to
 // 2) Sequential list: address (routes will be built between consecutive rows)
 
-type Pair = { from: string; to: string };
+// type Pair = { from: string; to: string };
+type Pair = {
+  from: string;
+  to: string;
+
+  // metadata fields (all optional; filled if present in CSV)
+  month?: string;
+  class?: string;
+  team?: string;
+  location_name?: string;
+  activity?: string;
+
+  // Always keep the original raw strings
+  original_from?: string;
+  original_to?: string;
+};
+
 
 function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
   const rows: any[] = parsed.data?.filter(Boolean) || [];
@@ -93,6 +117,18 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
   const first = rows[0];
   const hasHeaderObjects = typeof first === "object" && !Array.isArray(first);
 
+  // helpers
+  const normKeys = (obj: Record<string, any>) => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) out[String(k).trim().toLowerCase()] = v;
+    return out;
+  };
+  const asString = (v: any) => {
+    if (v === null || v === undefined) return undefined;
+    const s = String(v).trim();
+    return s === "" ? undefined : s;
+  };
+
   if (hasHeaderObjects) {
     // headered CSV
     const headerKeys = Object.keys(first).map((k) => k.trim().toLowerCase());
@@ -100,36 +136,76 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
     const hasAddress = headerKeys.includes("address") || headerKeys.includes("addresses");
 
     if (hasFromTo) {
+      // Pull through known metadata columns if present
       return rows
-        .map((r) => ({ from: String(r["from"]).trim(), to: String(r["to"]).trim() }))
-        .filter((p) => p.from && p.to);
+        .map((r) => {
+          const row = normKeys(r);
+          const from = asString(row["from"]);
+          const to = asString(row["to"]);
+          if (!from || !to) return null;
+          const pair: Pair = {
+            from,
+            to,
+            original_from: from,
+            original_to: to,
+            month: asString(row["month"]),
+            team: asString(row["team"]),
+            class: asString(row["class"]),
+            location_name: asString(row["location_name"]),
+            activity: asString(row["activity"]),
+          };
+          return pair;
+        })
+        .filter(Boolean) as Pair[];
     }
+
     if (hasAddress) {
-      const list: string[] = rows.map((r) => String(r["address"] ?? r["addresses"]).trim()).filter(Boolean);
-      return list.slice(0, -1).map((addr, i) => ({ from: addr, to: list[i + 1] }));
+      const list: string[] = rows.map((r) => {
+        const row = normKeys(r);
+        return asString(row["address"] ?? row["addresses"]);
+      }).filter(Boolean) as string[];
+      return list.slice(0, -1).map((addr, i) => ({
+        from: addr,
+        to: list[i + 1],
+        original_from: addr,
+        original_to: list[i + 1],
+      }));
     }
 
     // Fallback: try first two columns as from/to
     return rows
       .map((r) => {
         const cols = Object.values(r);
-        return { from: String(cols[0] ?? "").trim(), to: String(cols[1] ?? "").trim() };
+        const from = asString(cols[0]);
+        const to = asString(cols[1]);
+        if (!from || !to) return null;
+        const pair: Pair = { from, to, original_from: from, original_to: to };
+        return pair;
       })
-      .filter((p) => p.from && p.to);
+      .filter(Boolean) as Pair[];
   } else {
     // headerless rows are arrays
     const arrRows: any[][] = rows as any[];
-    // if two+ columns → treat [0]=from, [1]=to per row
     const twoCol = arrRows.every((r) => Array.isArray(r) && r.length >= 2 && r[0] && r[1]);
     if (twoCol) {
-      return arrRows.map((r) => ({ from: String(r[0]).trim(), to: String(r[1]).trim() }));
+      return arrRows.map((r) => {
+        const from = String(r[0]).trim();
+        const to = String(r[1]).trim();
+        const pair: Pair = { from, to, original_from: from, original_to: to };
+        return pair;
+      });
     }
     // otherwise treat first column as sequential list
     const list = arrRows.map((r) => String(r?.[0] ?? "").trim()).filter(Boolean);
-    console.log("list", list);
-    return list.slice(0, -1).map((addr, i) => ({ from: addr, to: list[i + 1] }));
+    return list.slice(0, -1).map((addr, i) => ({
+      from: addr,
+      to: list[i + 1],
+      original_from: addr,
+      original_to: list[i + 1],
+    }));
   }
 }
+
 
 // ---- Page Component
 export default function Page() {
@@ -202,14 +278,33 @@ export default function Page() {
     const feats: RouteFeature[] = [];
 
     for (let i = 0; i < pairs.length; i++) {
-      const { from, to } = pairs[i];
+      const pair = pairs[i];
+      const { from, to } = pair;
       try {
         const [a, b] = await Promise.all([
           cache.get(from) || geocodeMapTiler(from, MAPTILER_KEY).then((c) => (cache.set(from, c), c)),
           cache.get(to) || geocodeMapTiler(to, MAPTILER_KEY).then((c) => (cache.set(to, c), c)),
         ]);
         const feat = await routeOSRM(a, b, profile);
-        feats.push(feat);
+        
+
+        // add metadata to properties
+        const enriched: RouteFeature = {
+          ...feat,
+          properties: {
+            ...feat.properties,
+            month: pair.month,
+            class: pair.class,
+            team: pair.team,
+            original_from: pair.original_from ?? pair.from,
+            original_to: pair.original_to ?? pair.to,
+            location_name: pair.location_name,
+            activity: pair.activity,
+          },
+        };
+
+        feats.push(enriched);
+
       } catch (e: any) {
         console.warn("Skipping pair due to error:", from, to, e);
       }

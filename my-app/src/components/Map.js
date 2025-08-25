@@ -19,15 +19,22 @@ export default function Map() {
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
+    // live view info for on-screen readout
+    const [viewInfo, setViewInfo] = useState({
+        lng: -122.4194,
+        lat: 37.7749,
+        zoom: 12,
+    });
+
     // Define the two camera view configurations
     const sfView = {
-        center: [-122.4194, 37.7749], // San Francisco
-        zoom: 12,
+        center: [-122.43609, 37.77169], // San Francisco
+        zoom: 12.9,
     };
 
     const bayAreaView = {
-        center: [-122.25, 37.75], // A central point to see SF, Berkeley, and Palo Alto
-        zoom: 9.5,
+        center: [-122.27463, 37.61096], // A central point to see SF, Berkeley, and Palo Alto
+        zoom: 10.25,
     };
 
     // Initialize map
@@ -56,6 +63,38 @@ export default function Map() {
             map.current = null;
         };
     }, [API_KEY]); // Only run once on mount
+
+
+    // Log center/zoom after interactions and keep readout in sync
+    useEffect(() => {
+        if (!isMapLoaded || !map.current) return;
+
+        const logView = () => {
+            const c = map.current.getCenter();
+            const z = map.current.getZoom();
+            // Update on-screen readout
+            setViewInfo({ lng: c.lng, lat: c.lat, zoom: z });
+            // Console log
+            console.log(
+                `[Map] center=(${c.lng.toFixed(5)}, ${c.lat.toFixed(5)}), zoom=${z.toFixed(2)}`
+            );
+        };
+
+        // Do an initial log/readout sync
+        logView();
+
+        // Use *end events to avoid spammy logs
+        map.current.on('moveend', logView);
+        map.current.on('zoomend', logView);
+        map.current.on('rotateend', logView); // optional, in case rotation nudges center
+
+        return () => {
+            if (!map.current) return;
+                map.current.off('moveend', logView);
+                map.current.off('zoomend', logView);
+                map.current.off('rotateend', logView);
+        };
+    }, [isMapLoaded]);
 
     // Function to handle the button click
     const toggleView = () => {
@@ -98,6 +137,28 @@ export default function Map() {
                 {isZoomedOut ? 'Zoom to San Francisco' : 'Zoom to Bay Area'}
             </button>
 
+            {/* on-map readout */}
+            <div
+                style={{
+                position: 'absolute',
+                left: '20px',
+                bottom: '20px',
+                zIndex: 1,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                pointerEvents: 'none', // don't block map interactions
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                }}
+            >
+                lng: {viewInfo.lng.toFixed(5)} | lat: {viewInfo.lat.toFixed(5)} | zoom:{' '}
+                {viewInfo.zoom.toFixed(2)}
+            </div>
+
             <div 
                 ref={mapContainer} 
                 className="map"
@@ -106,7 +167,7 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     <RouteLayer map={map.current} />
-                    <RouteGenerator map={map.current} apiKey={API_KEY} />
+                    {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
                 </>                 
             )}
         </div>

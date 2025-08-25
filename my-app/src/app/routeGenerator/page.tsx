@@ -2,7 +2,7 @@
 
 import Papa from "papaparse";
 import React, { useMemo, useState } from "react";
-
+const GOOGLE_MAPS_KEY = "AIzaSyDFTmGfQ-E8ENu8LKCHBAaWIojRwCjn900";
 // ---- Types
 interface Coord {
   lon: number;
@@ -47,50 +47,38 @@ type Pair = {
   original_to?: string;
 };
 
+
+
+function toGTravelMode(p: "driving"|"cycling"|"walking") {
+  return p === "cycling" ? "BICYCLE" : p === "walking" ? "WALK" : "DRIVE";
+}
+
+
+
 // ---- Config
 const MAPTILER_KEY =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MAPTILER_KEY) || "ZAMOU7NPssEmiSXsELqD"; 
 const DEFAULT_PROFILE: "driving" | "cycling" | "walking" = "driving"; // OSRM profiles
 
 // ---- Helpers
-async function geocodeMapTiler(query: string, apiKey: string): Promise<Coord> {
-  const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(
-    query
-  )}.json?key=${apiKey}&limit=1&language=en&country=US`;
+async function geocodeGoogle(query: string, apiKey = GOOGLE_MAPS_KEY): Promise<Coord> {
+  if (!apiKey) throw new Error("Missing Google Maps API key");
+  const params = new URLSearchParams({
+    address: query,
+    language: "en",
+    components: "country:US", // optional: bias to US like your MapTiler call
+    key: apiKey,
+  });
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Geocoding failed (${res.status}) for: ${query}`);
   const data = await res.json();
-  const feat = data?.features?.[0];
-  if (!feat?.center) throw new Error(`No geocoding result for: ${query}`);
-  // MapTiler returns [lon, lat] in 'center'
-  return { lon: feat.center[0], lat: feat.center[1], name: feat.place_name || query };
+  const r = data?.results?.[0];
+  if (!r) throw new Error(`No geocoding result for: ${query}`);
+  const { lat, lng } = r.geometry.location;
+  return { lon: lng, lat, name: r.formatted_address || query };
 }
 
-// async function routeOSRM(
-//   a: Coord,
-//   b: Coord,
-//   profile: "driving" | "cycling" | "walking" = DEFAULT_PROFILE
-// ): Promise<RouteFeature> {
-//   // OSRM expects lon,lat;lon,lat and returns GeoJSON with geometries=geojson
-//   const base = "https://router.project-osrm.org/route/v1";
-//   const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
-//   const res = await fetch(url);
-//   if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
-//   const data = await res.json();
-//   const r = data?.routes?.[0];
-//   if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
-//   return {
-//     type: "Feature",
-//     properties: {
-//       distance_m: r.distance,
-//       duration_s: r.duration,
-//       from: a.name || "from",
-//       to: b.name || "to",
-//       profile,
-//     },
-//     geometry: r.geometry, // GeoJSON LineString in [lon, lat]
-//   };
-// }
 
 function haversineMeters([lon1, lat1]: number[], [lon2, lat2]: number[]) {
   const R = 6371000;
@@ -102,29 +90,50 @@ function haversineMeters([lon1, lat1]: number[], [lon2, lat2]: number[]) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-async function routeOSRMWithTail(a: Coord, b: Coord, profile: "driving"|"cycling"|"walking"): Promise<RouteFeature> {
-  const base = "https://router.project-osrm.org/route/v1";
-  const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false&approaches=unrestricted;curb`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
+// Google Routes API — returns GeoJSON already
+async function routeGoogle(
+  a: Coord, b: Coord, profile: "driving"|"cycling"|"walking"
+): Promise<RouteFeature> {
+  if (!GOOGLE_MAPS_KEY) throw new Error("Missing Google Maps API key");
+
+  const body = {
+    origin:       { location: { latLng: { latitude: a.lat, longitude: a.lon } } },
+    destination:  { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
+    travelMode:   toGTravelMode(profile),
+    polylineEncoding: "GEO_JSON_LINESTRING",
+    polylineQuality:  "HIGH_QUALITY"
+  };
+
+  const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+      "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.geoJsonLinestring"
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Google routing failed (${res.status}) for: ${a.name} → ${b.name}`);
   const data = await res.json();
   const r = data?.routes?.[0];
-  if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
+  const line = r?.polyline?.geoJsonLinestring as GeoJSON.LineString | undefined;
+  if (!line) throw new Error(`No Google route geometry for: ${a.name} → ${b.name}`);
 
-  const geom = r.geometry as GeoJSON.LineString;
-  const coords = geom.coordinates.slice();
+  // optional: keep your "last meters to door" tail
+  const coords = line.coordinates.slice();
   const last = coords[coords.length - 1];
-  const tail = [b.lon, b.lat] as [number, number];
-
-  // append a short “last meters to door” segment
-  coords.push(tail);
+  const tail: [number, number] = [b.lon, b.lat];
   const extra = haversineMeters(last, tail);
+  if (extra > 0) coords.push(tail);
+
+  // Google returns duration like "1234s" — parse to seconds
+  const seconds = typeof r.duration === "string" ? parseFloat(r.duration.replace("s","")) : 0;
 
   return {
     type: "Feature",
     properties: {
-      distance_m: r.distance + extra,
-      duration_s: r.duration,               // keep car time; (see option 3 to model walking time)
+      distance_m: r.distanceMeters,
+      duration_s: seconds,
       from: a.name || "from",
       to: b.name || "to",
       profile,
@@ -132,6 +141,8 @@ async function routeOSRMWithTail(a: Coord, b: Coord, profile: "driving"|"cycling
     geometry: { type: "LineString", coordinates: coords },
   };
 }
+
+
 
 function downloadJSON(obj: unknown, filename = "routes.geojson") {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/geo+json" });
@@ -204,56 +215,8 @@ function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
         })
         .filter(Boolean) as Pair[];
     }
-
-    // if (hasAddress) {
-    //   const list: string[] = rows.map((r) => {
-    //     const row = normKeys(r);
-    //     return asString(row["address"] ?? row["addresses"]);
-    //   }).filter(Boolean) as string[];
-    //   return list.slice(0, -1).map((addr, i) => ({
-    //     from: addr,
-    //     to: list[i + 1],
-    //     profile: row["profile"],
-    //     original_from: addr,
-    //     original_to: list[i + 1],
-    //   }));
-    // }
-
-    // Fallback: try first two columns as from/to
-    return rows
-      .map((r) => {
-        const cols = Object.values(r);
-        const from = asString(cols[0]);
-        const to = asString(cols[1]);
-        const profile : "driving" | "cycling" | "walking"= cols[-1];
-        if (!from || !to) return null;
-        const pair: Pair = { from, to, profile, original_from: from, original_to: to };
-        return pair;
-      })
-      .filter(Boolean) as Pair[];
-  } else {
-    // headerless rows are arrays
-    const arrRows: any[][] = rows as any[];
-    const twoCol = arrRows.every((r) => Array.isArray(r) && r.length >= 2 && r[0] && r[1]);
-    if (twoCol) {
-      return arrRows.map((r) => {
-        const from = String(r[0]).trim();
-        const to = String(r[1]).trim();
-        const profile = String(r[-1]).trim();
-        const pair: Pair = { from, to, profile, original_from: from, original_to: to };
-        return pair;
-      });
-    }
-    // otherwise treat first column as sequential list
-    const list = arrRows.map((r) => String(r?.[0] ?? "").trim()).filter(Boolean);
-    return list.slice(0, -1).map((addr, i) => ({
-      from: addr,
-      to: list[i + 1],
-      profile: DEFAULT_PROFILE,
-      original_from: addr,
-      original_to: list[i + 1],
-    }));
   }
+
 }
 
 
@@ -331,10 +294,10 @@ export default function Page() {
       const { from, to, profile } = pair;
       try {
         const [a, b] = await Promise.all([
-          cache.get(from) || geocodeMapTiler(from, MAPTILER_KEY).then((c) => (cache.set(from, c), c)),
-          cache.get(to) || geocodeMapTiler(to, MAPTILER_KEY).then((c) => (cache.set(to, c), c)),
+          cache.get(from) || geocodeGoogle(from, GOOGLE_MAPS_KEY).then((c) => (cache.set(from, c), c)),
+          cache.get(to) || geocodeGoogle(to, GOOGLE_MAPS_KEY).then((c) => (cache.set(to, c), c)),
         ]);
-        const feat = await routeOSRMWithTail(a, b, profile);
+        const feat = await routeGoogle(a, b, profile);
         
 
         // add metadata to properties

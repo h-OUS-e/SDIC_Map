@@ -4,37 +4,26 @@ import maplibregl from 'maplibre-gl';
 import React, { useMemo, useState } from 'react';
 
 // Small helpers
-async function geocode(query, apiKey) {
-  const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${apiKey}&limit=1&language=en&country=US`;
+
+async function geocodeGoogle(query, apiKey = GOOGLE_MAPS_KEY){
+  if (!apiKey) throw new Error("Missing Google Maps API key");
+  const params = new URLSearchParams({
+    address: query,
+    language: "en",
+    components: "country:US", // optional: bias to US like your MapTiler call
+    key: apiKey,
+  });
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Geocoding failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Geocoding failed (${res.status}) for: ${query}`);
   const data = await res.json();
-  const feat = data?.features?.[0];
-  if (!feat?.center) throw new Error(`No result for: ${query}`);
-  // MapTiler returns [lon, lat] in 'center'
-  return { lon: feat.center[0], lat: feat.center[1], name: feat.place_name || query };
+  console.log("TEST", data)
+  const r = data?.results?.[0];
+  if (!r) throw new Error(`No geocoding result for: ${query}`);
+  const { lat, lng } = r.geometry.location;
+  return { lon: lng, lat, name: r.formatted_address || query };
 }
 
-async function routeOSRM(a, b, profile = 'driving') {
-  // OSRM expects lon,lat;lon,lat and can return GeoJSON geometry
-  const base = 'https://router.project-osrm.org/route/v1';
-  const url = `${base}/${profile}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Routing failed: ${res.status}`);
-  const data = await res.json();
-  const r = data?.routes?.[0];
-  if (!r?.geometry) throw new Error('No route geometry returned');
-  // Wrap as a Feature so we can save/render consistently
-  return {
-    type: 'Feature',
-    properties: {
-      distance_m: r.distance,
-      duration_s: r.duration,
-      profile
-    },
-    geometry: r.geometry // GeoJSON LineString in [lon, lat]
-  };
-}
 
 function haversineMeters([lon1, lat1], [lon2, lat2]) {
   const R = 6371000;
@@ -46,36 +35,7 @@ function haversineMeters([lon1, lat1], [lon2, lat2]) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-async function routeOSRMWithTail(a, b, profile = "walking") {
-  const base = "https://router.project-osrm.org/route/v1";
-  const url = `${base}/${"profile"}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&steps=false`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Routing failed (${res.status}) for: ${a.name} → ${b.name}`);
-  const data = await res.json();
-  const r = data?.routes?.[0];
-  if (!r?.geometry) throw new Error(`No route geometry for: ${a.name} → ${b.name}`);
 
-  const geom = r.geometry;
-  const coords = geom.coordinates.slice();
-  const last = coords[coords.length - 1];
-  const tail = [b.lon, b.lat] ;
-
-  // append a short “last meters to door” segment
-  coords.push(tail);
-  const extra = haversineMeters(last, tail);
-
-  return {
-    type: "Feature",
-    properties: {
-      distance_m: r.distance + extra,
-      duration_s: r.duration,               // keep car time; (see option 3 to model walking time)
-      from: a.name || "from",
-      to: b.name || "to",
-      profile,
-    },
-    geometry: { type: "LineString", coordinates: coords },
-  };
-}
 
 function downloadJSON(obj, filename = 'route.geojson') {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/geo+json' });
@@ -132,14 +92,73 @@ export default function RouteGenerator({
     }
   };
 
+const GOOGLE_MAPS_KEY = "AIzaSyDFTmGfQ-E8ENu8LKCHBAaWIojRwCjn900";
+
+
+function toGTravelMode(p) {
+  return p === "cycling" ? "BICYCLE" : p === "walking" ? "WALK" : "DRIVE";
+}
+
+// Google Routes API — returns GeoJSON already
+async function routeGoogle(a, b, profile) {
+  if (!GOOGLE_MAPS_KEY) throw new Error("Missing Google Maps API key");
+
+  const body = {
+    origin:       { location: { latLng: { latitude: a.lat, longitude: a.lon } } },
+    destination:  { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
+    travelMode:   toGTravelMode(profile),
+    polylineEncoding: "GEO_JSON_LINESTRING",
+    polylineQuality:  "HIGH_QUALITY"
+  };
+
+  const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+      "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.geoJsonLinestring"
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Google routing failed (${res.status}) for: ${a.name} → ${b.name}`);
+  const data = await res.json();
+  const r = data?.routes?.[0];
+  const line = r?.polyline?.geoJsonLinestring ;
+  if (!line) throw new Error(`No Google route geometry for: ${a.name} → ${b.name}`);
+
+  // optional: keep your "last meters to door" tail
+  const coords = line.coordinates.slice();
+  const last = coords[coords.length - 1];
+  const tail = [b.lon, b.lat];
+  const extra = haversineMeters(last, tail);
+  if (extra > 0) coords.push(tail);
+
+  // Google returns duration like "1234s" — parse to seconds
+  const seconds = typeof r.duration === "string" ? parseFloat(r.duration.replace("s","")) : 0;
+
+  return {
+    type: "Feature",
+    properties: {
+      distance_m: r.distanceMeters,
+      duration_s: seconds,
+      from: a.name || "from",
+      to: b.name || "to",
+      profile,
+    },
+    geometry: { type: "LineString", coordinates: coords },
+  };
+}
+
+
   const buildRoute = async () => {
     try {
       setErr(null);
       setLoading(true);
-      const [p1, p2] = await Promise.all([geocode(from, apiKey), geocode(to, apiKey)]);
-      const feat = await routeOSRMWithTail(p1, p2, profile);
+      const [p1, p2] = await Promise.all([geocodeGoogle(from, GOOGLE_MAPS_KEY), geocodeGoogle(to, GOOGLE_MAPS_KEY)]);
+      const feat = await routeGoogle(p1, p2, profile);
       setRouteFeature(feat);
       // Immediately render on the map
+
       addOrUpdateLayer(feat);
     } catch (e) {
       setErr(e.message || String(e));

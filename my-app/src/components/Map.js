@@ -185,7 +185,7 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     {/* [TRIPS ADD] keep camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} onData={handleGeojson} fitOnLoad={false} />
+                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} />
 
                     {/* [TRIPS ADD] animated trips overlay */}
                     {map.current && trips.length > 0 && (

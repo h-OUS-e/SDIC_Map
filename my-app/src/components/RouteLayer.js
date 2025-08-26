@@ -5,13 +5,14 @@ import React, { useEffect, useRef, useState } from 'react';
 
 export default function RouteLayer({
   map,
-  url,
+  url = '/assets/routes/route.geojson',
   sourceId = 'saved-route',
   layerId = 'saved-route-line',
   opacity = 0.3
 }) {
   const [geojson, setGeojson] = useState(null);
   const popupRef = useRef(null);
+  console.log("TEST", url)
 
   // helpers
   const escapeHtml = (s) =>

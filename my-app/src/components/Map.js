@@ -166,7 +166,7 @@ export default function Map() {
             />
             {isMapLoaded && (
                 <>
-                    <RouteLayer map={map.current} />
+                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" />
                     <RouteGenerator map={map.current} apiKey={API_KEY} />
                 </>                 
             )}

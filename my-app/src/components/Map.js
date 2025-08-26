@@ -5,8 +5,12 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
 import RouteLayer from './RouteLayer'; // Import the new component
-const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 
+// [TRIPS ADD]
+import TripsOverlay from './TripsOverlay';
+import { toTripsData } from '../utils/prepareTrips';
+
+const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 
 export default function Map() {
     const mapContainer = useRef(null);
@@ -18,6 +22,9 @@ export default function Map() {
 
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+    // [TRIPS ADD] animated trips data
+    const [trips, setTrips] = useState([]);
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -115,6 +122,17 @@ export default function Map() {
         setIsZoomedOut(!isZoomedOut);
     };
 
+    // [TRIPS ADD] receive GeoJSON from RouteLayer; convert to trips
+    const handleGeojson = (fc) => {
+        try {
+            const t = toTripsData(fc); // -> [{ path, timestamps, color }]
+            setTrips(t);
+            console.log(`[Trips] prepared ${t.length} routes`);
+        } catch (e) {
+            console.error('Failed to prepare trips', e);
+        }
+    };
+
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             {/* A Switch button to toggle between SF zoom in and out.*/}
@@ -166,7 +184,20 @@ export default function Map() {
             />
             {isMapLoaded && (
                 <>
-                    <RouteLayer map={map.current} />
+                    {/* [TRIPS ADD] keep camera stable by disabling fit; expose data upward */}
+                    <RouteLayer map={map.current} onData={handleGeojson} fitOnLoad={false} />
+
+                    {/* [TRIPS ADD] animated trips overlay */}
+                    {map.current && trips.length > 0 && (
+                        <TripsOverlay
+                            map={map.current}
+                            data={trips}
+                            speed={2.8}    // tweak freely
+                            trail={10}
+                            lineWidth={2.1}
+                        />
+                    )}
+
                     {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
                 </>                 
             )}

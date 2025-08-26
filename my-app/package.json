@@ -9,7 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.1.14",
+    "@deck.gl/geo-layers": "^9.1.14",
+    "@deck.gl/layers": "^9.1.14",
+    "@deck.gl/mapbox": "^9.1.14",
     "@maptiler/sdk": "^3.7.0",
+    "deck.gl": "^9.1.14",
     "next": "15.5.0",
     "papaparse": "^5.5.3",
     "react": "19.1.0",

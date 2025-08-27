@@ -197,8 +197,8 @@ export default function RouteLayer({
               1,
               DARK_BLUE, // End with dark blue
             ],
-            "line-width": CRAYON_WIDTH + 1.5,
-            "line-opacity": CRAYON_OPACITY * opacity * 0.3,
+            "line-width": CRAYON_WIDTH + 2.5,
+            "line-opacity": CRAYON_OPACITY * opacity * 0.4,
           },
         },
         layerId,

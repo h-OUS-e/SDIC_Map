@@ -4,7 +4,8 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
-import RouteLayer from './RouteLayer'; // Import the new component
+import RouteLayer from './RouteLayer'; 
+import RouteLayerWithFrequency from "./RouteLayerWithFrequency" 
 
 // [TRIPS ADD]
 import TripsOverlay from './TripsOverlay';
@@ -16,6 +17,7 @@ export default function Map() {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const [API_KEY] = useState(MAPTILER_API_KEY);
+    const [visualizationMode, setVisualizationMode] = useState("offset"); // "offset" | "stack"
     
     // State to track the current view (true = Bay Area, false = SF)
     const [isZoomedOut, setIsZoomedOut] = useState(false);
@@ -187,14 +189,25 @@ export default function Map() {
                     {/* [TRIPS ADD] keep camera stable by disabling fit; expose data upward */}
                     <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} />
 
+                              {/* <RouteLayerWithFrequency
+                                map={map.current}
+                                url="/assets/routes/routes.geojson"
+                                onData={handleGeojson}
+                                fitOnLoad={false}
+                                // visualizationMode={visualizationMode}
+                                maxFrequency={10}
+                            /> */}
+
                     {/* [TRIPS ADD] animated trips overlay */}
                     {map.current && trips.length > 0 && (
                         <TripsOverlay
                             map={map.current}
                             data={trips}
                             speed={2.8}    // tweak freely
-                            trail={10}
-                            lineWidth={2.1}
+                            trail={100}
+                            opacity={0.55}
+                            lineWidth={3.1}
+                            
                         />
                     )}
 

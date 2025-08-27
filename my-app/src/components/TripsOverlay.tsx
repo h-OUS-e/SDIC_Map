@@ -27,7 +27,7 @@ export default function TripsOverlay({
   trail = 24,
   lineWidth = 0.05, // Made even thinner than route layer (2.5px) for subtle overlay
   fps = 30,
-  opacity = 0.35, // Much lower opacity for subtle animation
+  opacity = 0.55, // Much lower opacity for subtle animation
 }: Props) {
   const overlayRef = useRef<MapboxOverlay | null>(null)
   const rafRef = useRef<number | null>(null)

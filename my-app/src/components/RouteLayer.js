@@ -3,31 +3,30 @@
 import maplibregl from "maplibre-gl"
 import { useEffect, useRef, useState } from "react"
 
-// ---------- Look & Feel (refined gradient colors from reference image) ----------
+
 const LIGHT_BLUE = "#60a5fa" // Bright electric blue (start color)
 const MEDIUM_BLUE = "#3b82f6" // Medium electric blue
 const DARK_BLUE = "#1e40af" // Deep blue (end color)
 const ACCENT_BLUE = "#1e3a8a" // Navy blue (darkest end)
 
-const CRAYON_WIDTH = 1.5 // Thinner lines
-const CRAYON_OPACITY = 0.65 // Reduced opacity
+const CRAYON_WIDTH = 3.5 
+const CRAYON_OPACITY = 0.65
 
-// ---------------------------------------------
 
 export default function RouteLayer({
   map,
-  url,
+  url = '/assets/routes/route.geojson',
   sourceId = "saved-route",
-  layerId = "saved-route-line", // will also create -origin-dot
+  layerId = "saved-route-line", //origin line?
   opacity = 1.0,
-  onData,
-  fitOnLoad = false,
-  routeImportance = "medium", // "low", "medium", "high", "very-high"
+  onData, //callback to notify after reloading the data
+  fitOnLoad = false, //whether we want to autozoom the route once awe load it
+  routeImportance = "medium",
 }) {
   const [geojson, setGeojson] = useState(null)
   const lastSentRef = useRef(null)
 
-  // Load from URL if provided
+  // Load from URL 
   useEffect(() => {
     let cancelled = false
     if (!url) return
@@ -49,6 +48,7 @@ export default function RouteLayer({
     if (!map) return
 
     // Create SVG filter for crayon texture
+    //doesnt change anything bs maplibre drawa to canvas not dom elements per layer. this filter is not affecting the gl dom layer
     const svgFilter = `
       <svg style="position: absolute; width: 0; height: 0;">
         <defs>
@@ -87,9 +87,9 @@ export default function RouteLayer({
     // Ensure FeatureCollection
     const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
 
-    // =========================
-    // NEW: frequency annotation
-    // =========================
+
+//FREWUENCY ANNOTATION 
+//     Two identical polylines (even if one is reversed) should be considered “the same” segment.
     const round = (n, p = 6) => Math.round(n * 10 ** p) / 10 ** p
 
     const normLine = (coords) => {
@@ -125,6 +125,7 @@ export default function RouteLayer({
       freqMap.set(k, (freqMap.get(k) || 0) + 1)
     }
 
+ // we count duplicates and style them
     const processedFC = {
       ...fc,
       features: (fc.features || []).map((feature, index) => {
@@ -135,19 +136,19 @@ export default function RouteLayer({
             ...feature,
             properties: {
               ...feature.properties,
-              gradient: 1,
-              hasFillets: Math.random() > 0.5, // 50% chance for fillets
+              gradient: 2,
+              hasFillets: Math.random() > 0.7, // 70% chance for fillets
               routeIndex: index,
-              freq, // <-- NEW: frequency property used for styling
+              freq, 
             },
           }
         }
         return feature
       }),
     }
-    // =========================
 
-    // --- add/update LINE source ---
+
+    //add/update LINE source 
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: "geojson",
@@ -189,7 +190,7 @@ export default function RouteLayer({
             "round", // Rounded joins for fillet effect
             "miter", // Sharp joins for non-fillet routes
           ],
-          "line-miter-limit": 8,
+          "line-miter-limit": 2,
         },
         paint: {
           "line-gradient": [
@@ -229,7 +230,7 @@ export default function RouteLayer({
       })
     }
 
-    // --- OUTLINE effect ---
+    // outline effect
     const outlineLayerId = `${layerId}-outline`
     if (!map.getLayer(outlineLayerId)) {
       map.addLayer(
@@ -252,7 +253,7 @@ export default function RouteLayer({
               1,
               DARK_BLUE, // End with dark blue
             ],
-            // NEW: outline also scales with frequency
+            // outline also scales with FREQUENCY 
             "line-width": [
               "*",
               CRAYON_WIDTH + 2.5,
@@ -272,14 +273,14 @@ export default function RouteLayer({
       ) // Place outline behind main line
     }
 
-    // --- ORIGIN marker: glowy blue circle ---
+    //ORIGIN marker: glowy blue circle
     const origin = (() => {
       const feat = (fc.features || []).find((x) => x.geometry && x.geometry.type === "LineString")
       const c = feat && feat.geometry && feat.geometry.coordinates && feat.geometry.coordinates[0]
       return Array.isArray(c) && c.length >= 2 ? c : null
     })()
 
-    // --- ENDPOINT marker: glowy blue circle ---
+    // ENDPOINT marker: glowy blue circle
     const endpoints = (() => {
       const lineFeatures = (fc.features || []).filter((x) => x.geometry && x.geometry.type === "LineString")
       return lineFeatures
@@ -320,7 +321,7 @@ export default function RouteLayer({
           source: pointSourceId,
           paint: {
             "circle-color": LIGHT_BLUE,
-            "circle-radius": 16, // Increased from 8
+            "circle-radius": 16, 
             "circle-opacity": 0.15,
           },
         })
@@ -333,8 +334,8 @@ export default function RouteLayer({
           type: "circle",
           source: pointSourceId,
           paint: {
-            "circle-color": LIGHT_BLUE, // Changed from MEDIUM_BLUE to LIGHT_BLUE
-            "circle-radius": 12, // Increased from 5
+            "circle-color": LIGHT_BLUE, 
+            "circle-radius": 12, 
             "circle-opacity": 0.3,
           },
         })
@@ -347,8 +348,8 @@ export default function RouteLayer({
           type: "circle",
           source: pointSourceId,
           paint: {
-            "circle-color": LIGHT_BLUE, // Changed from ACCENT_BLUE to LIGHT_BLUE
-            "circle-radius": 4, // Increased from 3
+            "circle-color": LIGHT_BLUE, 
+            "circle-radius": 4, 
             "circle-opacity": 0.9,
           },
         })
@@ -379,7 +380,7 @@ export default function RouteLayer({
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": ACCENT_BLUE, // Changed from LIGHT_BLUE to ACCENT_BLUE
+            "circle-color": ACCENT_BLUE, 
             "circle-radius": [
               "interpolate",
               ["linear"],
@@ -401,7 +402,7 @@ export default function RouteLayer({
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": ACCENT_BLUE, // Changed from MEDIUM_BLUE to ACCENT_BLUE
+            "circle-color": ACCENT_BLUE,
             "circle-radius": [
               "interpolate",
               ["linear"],

@@ -1,4 +1,3 @@
-// src/utils/prepareTrips.ts
 import type * as GeoJSON from "geojson"
 
 export type TripDatum = {

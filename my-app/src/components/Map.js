@@ -17,7 +17,7 @@ export default function Map() {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const [API_KEY] = useState(MAPTILER_API_KEY);
-    const [visualizationMode, setVisualizationMode] = useState("offset"); // "offset" | "stack"
+    const [visualizationMode, setVisualizationMode] = useState("offset"); 
     
     // State to track the current view (true = Bay Area, false = SF)
     const [isZoomedOut, setIsZoomedOut] = useState(false);
@@ -193,11 +193,10 @@ export default function Map() {
                         <TripsOverlay
                             map={map.current}
                             data={trips}
-                            speed={2.8}    // tweak freely
-                            trail={100}
-                            opacity={0.55}
+                            speed={10.8}    // tweak freely
+                            trail={900}
+                            opacity={0.25}
                             lineWidth={3.1}
-                            
                         />
                     )} */}
 

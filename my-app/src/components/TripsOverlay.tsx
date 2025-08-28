@@ -23,9 +23,9 @@ const SUBTLE_BLUE: Color = [195, 221, 253] // #60a5fa - lighter blue for better 
 export default function TripsOverlay({
   map,
   data,
-  speed = 0.8, // Slowed down from 1 to 0.3 for more pleasant animation speed
+  speed = 0.8, 
   trail = 24,
-  lineWidth = 0.05, // Made even thinner than route layer (2.5px) for subtle overlay
+  lineWidth = 0.05,
   fps = 30,
   opacity = 0.55, // Much lower opacity for subtle animation
 }: Props) {
@@ -84,6 +84,8 @@ export default function TripsOverlay({
       const now = performance.now()
       if (now - lastFrame.current >= frameInterval) {
         const elapsed = (now - t0.current) / 1000
+        const period = 90 
+        // const currentTime = (elapsed * speed) % period
         const currentTime = elapsed * speed
 
         // console.log("[v0] Animation frame:", { elapsed, currentTime, speed })

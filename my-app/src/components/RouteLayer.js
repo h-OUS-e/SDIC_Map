@@ -9,7 +9,7 @@ const MEDIUM_BLUE = "#3b82f6" // Medium electric blue
 const DARK_BLUE = "#1e40af" // Deep blue (end color)
 const ACCENT_BLUE = "#1e3a8a" // Navy blue (darkest end)
 
-const CRAYON_WIDTH = 2.5 // Thinner lines
+const CRAYON_WIDTH = 1.5 // Thinner lines
 const CRAYON_OPACITY = 0.65 // Reduced opacity
 
 // ---------------------------------------------
@@ -87,24 +87,65 @@ export default function RouteLayer({
     // Ensure FeatureCollection
     const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
 
+    // =========================
+    // NEW: frequency annotation
+    // =========================
+    const round = (n, p = 6) => Math.round(n * 10 ** p) / 10 ** p
+
+    const normLine = (coords) => {
+      const cleaned = []
+      let prev = null
+      for (const c of coords || []) {
+        const rc = [round(c[0]), round(c[1])]
+        if (!prev || rc[0] !== prev[0] || rc[1] !== prev[1]) cleaned.push(rc)
+        prev = rc
+      }
+      if (cleaned.length < 2) return cleaned.concat(cleaned)
+      const f = cleaned.map((c) => `${c[0]},${c[1]}`).join("|")
+      const b = [...cleaned].reverse().map((c) => `${c[0]},${c[1]}`).join("|")
+      return f < b ? f : b // direction-agnostic
+    }
+
+    const normMulti = (multi) => {
+      const parts = (multi || []).map((p) => normLine(p)).filter(Boolean)
+      return parts.sort().join("||")
+    }
+
+    const geomKey = (geom) => {
+      if (!geom) return "NONE"
+      if (geom.type === "LineString") return "L:" + normLine(geom.coordinates)
+      if (geom.type === "MultiLineString") return "ML:" + normMulti(geom.coordinates)
+      return "O:" + JSON.stringify(geom.coordinates)
+    }
+
+    // Count identical geometries
+    const freqMap = new Map()
+    for (const feat of fc.features || []) {
+      const k = geomKey(feat.geometry)
+      freqMap.set(k, (freqMap.get(k) || 0) + 1)
+    }
+
     const processedFC = {
       ...fc,
-      features: fc.features.map((feature, index) => {
-        if (feature.geometry?.type === "LineString") {
+      features: (fc.features || []).map((feature, index) => {
+        const k = geomKey(feature.geometry)
+        const freq = freqMap.get(k) || 1
+        if (feature.geometry?.type === "LineString" || feature.geometry?.type === "MultiLineString") {
           return {
             ...feature,
             properties: {
               ...feature.properties,
-              // Add gradient property for line-gradient paint
               gradient: 1,
               hasFillets: Math.random() > 0.5, // 50% chance for fillets
               routeIndex: index,
+              freq, // <-- NEW: frequency property used for styling
             },
           }
         }
         return feature
       }),
     }
+    // =========================
 
     // --- add/update LINE source ---
     if (!map.getSource(sourceId)) {
@@ -162,8 +203,22 @@ export default function RouteLayer({
             1,
             ACCENT_BLUE, // End with dark navy blue
           ],
-          "line-width": lineStyle.width,
-          "line-opacity": lineStyle.opacity * opacity,
+          //  thickness scales with frequency (sqrt curve; min 1×)
+          "line-width": [
+            "*",
+            lineStyle.width,
+            ["max", 0.2, ["^", ["coalesce", ["get", "freq"], 1], 0.1]],
+          ],
+          // Slightly increase opacity with frequency
+          "line-opacity": [
+            "interpolate",
+            ["linear"],
+            ["coalesce", ["get", "freq"], 1],
+            1, lineStyle.opacity * opacity * 0.95,
+            3, lineStyle.opacity * opacity * 0.9,
+            6, lineStyle.opacity * opacity,
+            10, Math.min(1, lineStyle.opacity * opacity * 1.05),
+          ],
         },
       })
 
@@ -197,8 +252,20 @@ export default function RouteLayer({
               1,
               DARK_BLUE, // End with dark blue
             ],
-            "line-width": CRAYON_WIDTH + 2.5,
-            "line-opacity": CRAYON_OPACITY * opacity * 0.4,
+            // NEW: outline also scales with frequency
+            "line-width": [
+              "*",
+              CRAYON_WIDTH + 2.5,
+              ["max", 1, ["^", ["coalesce", ["get", "freq"], 1], 0.5]],
+            ],
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["coalesce", ["get", "freq"], 1],
+              1, CRAYON_OPACITY * opacity * 0.25,
+              3, CRAYON_OPACITY * opacity * 0.32,
+              6, CRAYON_OPACITY * opacity * 0.4,
+            ],
           },
         },
         layerId,
@@ -253,7 +320,7 @@ export default function RouteLayer({
           source: pointSourceId,
           paint: {
             "circle-color": LIGHT_BLUE,
-            "circle-radius": 12, // Increased from 8
+            "circle-radius": 16, // Increased from 8
             "circle-opacity": 0.15,
           },
         })
@@ -267,7 +334,7 @@ export default function RouteLayer({
           source: pointSourceId,
           paint: {
             "circle-color": LIGHT_BLUE, // Changed from MEDIUM_BLUE to LIGHT_BLUE
-            "circle-radius": 7, // Increased from 5
+            "circle-radius": 12, // Increased from 5
             "circle-opacity": 0.3,
           },
         })
@@ -317,14 +384,10 @@ export default function RouteLayer({
               "interpolate",
               ["linear"],
               ["zoom"],
-              8,
-              1, // At zoom 8, radius is 1px
-              10,
-              2, // At zoom 10, radius is 2px
-              12,
-              6, // At zoom 12, radius is 6px
-              16,
-              12, // At zoom 16, radius is 12px
+              8, 1,
+              10, 2,
+              12, 6,
+              16, 8,
             ],
             "circle-opacity": 0.15,
           },
@@ -343,14 +406,10 @@ export default function RouteLayer({
               "interpolate",
               ["linear"],
               ["zoom"],
-              8,
-              0.8, // At zoom 8, radius is 0.8px
-              10,
-              1.5, // At zoom 10, radius is 1.5px
-              12,
-              4, // At zoom 12, radius is 4px
-              16,
-              8, // At zoom 16, radius is 8px
+              8, 0.8,
+              10, 1.5,
+              12, 4,
+              16, 8,
             ],
             "circle-opacity": 0.3,
           },
@@ -369,14 +428,10 @@ export default function RouteLayer({
               "interpolate",
               ["linear"],
               ["zoom"],
-              8,
-              0.5, // At zoom 8, radius is 0.5px
-              10,
-              1, // At zoom 10, radius is 1px
-              12,
-              2.5, // At zoom 12, radius is 2.5px
-              16,
-              5, // At zoom 16, radius is 5px
+              8, 0.5,
+              10, 1,
+              12, 2.5,
+              16, 5,
             ],
             "circle-opacity": 0.9,
           },

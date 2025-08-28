@@ -124,7 +124,7 @@ export default function Map() {
         setIsZoomedOut(!isZoomedOut);
     };
 
-    // [TRIPS ADD] receive GeoJSON from RouteLayer; convert to trips
+    // receive GeoJSON from RouteLayer; convert to trips
     const handleGeojson = (fc) => {
         try {
             const t = toTripsData(fc); // -> [{ path, timestamps, color }]
@@ -170,7 +170,7 @@ export default function Map() {
                 borderRadius: '6px',
                 fontFamily: 'monospace',
                 fontSize: '13px',
-                pointerEvents: 'none', // don't block map interactions
+                pointerEvents: 'none', 
                 lineHeight: 1.3,
                 whiteSpace: 'nowrap',
                 }}
@@ -186,20 +186,10 @@ export default function Map() {
             />
             {isMapLoaded && (
                 <>
-                    {/* [TRIPS ADD] keep camera stable by disabling fit; expose data upward */}
+                    {/* camera stable by disabling fit; expose data upward */}
                     <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} />
 
-                              {/* <RouteLayerWithFrequency
-                                map={map.current}
-                                url="/assets/routes/routes.geojson"
-                                onData={handleGeojson}
-                                fitOnLoad={false}
-                                // visualizationMode={visualizationMode}
-                                maxFrequency={10}
-                            /> */}
-
-                    {/* [TRIPS ADD] animated trips overlay */}
-                    {map.current && trips.length > 0 && (
+                    {/* {map.current && trips.length > 0 && (
                         <TripsOverlay
                             map={map.current}
                             data={trips}
@@ -209,7 +199,7 @@ export default function Map() {
                             lineWidth={3.1}
                             
                         />
-                    )}
+                    )} */}
 
                     {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
                 </>                 

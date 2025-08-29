@@ -12,129 +12,9 @@ const SDIC_PINK = "#BA29BC"
 const SDIC_PURPLE = "#B026FF"
 const BRIGHT_RED = "#ff6b6b"
 const NEON_BLUE = "#2323ff"
-const WHITE = "#ffffff"
-const NEON_GREEN = "#39FF14"
-const MINT_GREEN = "#00FF93"
-const DARK_GREEN = "#138B4F"
 
-const CRAYON_WIDTH = 3.1
-const CRAYON_OPACITY = 0.35
-
-// --- ADDED: absolute-distance palette (in meters)
-const COLOR_BANDS = [
-  { upto:  500, color: SDIC_BLUE },   
-  { upto:  3000, color: SDIC_BLUE },  
-  { upto: 40000, color: SDIC_BLUE },    
-  { upto: 10000, color: DARK_GREEN }, 
-]
-const END_TIP_METERS = 500         // uniform end tip length for all routes
-const END_TIP_COLOR = MINT_GREEN
-
-// --- ADDED: distance helpers (no deps)
-function haversineMeters(a, b) {
-  const R = 6371000
-  const toRad = (x) => (x * Math.PI) / 180
-  const [lon1, lat1] = a, [lon2, lat2] = b
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const la1 = toRad(lat1), la2 = toRad(lat2)
-  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2
-  return 2 * R * Math.asin(Math.sqrt(h))
-}
-
-function cumulativeMeters(coords) {
-  const cum = [0]
-  for (let i = 1; i < coords.length; i++) {
-    cum.push(cum[i-1] + haversineMeters(coords[i-1], coords[i]))
-  }
-  return cum
-}
-
-function pointAtDistance(coords, cum, d) {
-  if (d <= 0) return coords[0]
-  const total = cum[cum.length - 1]
-  if (d >= total) return coords[coords.length - 1]
-  let i = 1
-  while (i < cum.length && cum[i] < d) i++
-  const a = coords[i-1], b = coords[i]
-  const segStart = cum[i-1], segLen = cum[i] - segStart
-  const t = (d - segStart) / segLen
-  return [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t]
-}
-
-function sliceAlongMeters(coords, d0, d1) {
-  const cum = cumulativeMeters(coords)
-  const total = cum[cum.length - 1]
-  const start = Math.max(0, Math.min(d0, total))
-  const end   = Math.max(0, Math.min(d1, total))
-  if (end <= start) return null
-  const out = []
-  out.push(pointAtDistance(coords, cum, start))
-  for (let i = 1; i < coords.length; i++) {
-    const dist = cum[i]
-    if (dist > start && dist < end) out.push(coords[i])
-  }
-  out.push(pointAtDistance(coords, cum, end))
-  return out
-}
-
-function explodeLineToAbsoluteBands(feature, baseProps = {}) {
-  const coords = feature.geometry.coordinates
-  if (!Array.isArray(coords) || coords.length < 2) return []
-  const cum = cumulativeMeters(coords)
-  const total = cum[cum.length - 1]
-
-  const tipLen = Math.min(END_TIP_METERS, total)
-  const tipStart = Math.max(0, total - tipLen)
-  const out = []
-
-  // bands from 0 → tipStart
-  let lastEdge = 0
-  if (tipStart > 0) {
-    for (let i = 0; i < COLOR_BANDS.length; i++) {
-      const bandStart = lastEdge
-      const bandEndAbs = COLOR_BANDS[i].upto
-      const bandEnd = Math.min(bandEndAbs, tipStart)
-      if (bandEnd > bandStart) {
-        const seg = sliceAlongMeters(coords, bandStart, bandEnd)
-        if (seg && seg.length >= 2) {
-          out.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: seg },
-            properties: { ...baseProps, color: COLOR_BANDS[i].color, segmentIndex: i, isTip: false },
-          })
-        }
-        lastEdge = bandEnd
-      }
-      if (lastEdge >= tipStart) break
-      if (i === COLOR_BANDS.length - 1 && lastEdge < tipStart) {
-        const seg = sliceAlongMeters(coords, lastEdge, tipStart)
-        if (seg && seg.length >= 2) {
-          out.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: seg },
-            properties: { ...baseProps, color: COLOR_BANDS[i].color, segmentIndex: i + 1, isTip: false },
-          })
-        }
-        lastEdge = tipStart
-      }
-    }
-  }
-
-  // end tip
-  if (tipLen > 0) {
-    const tipSeg = sliceAlongMeters(coords, tipStart, total)
-    if (tipSeg && tipSeg.length >= 2) {
-      out.push({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: tipSeg },
-        properties: { ...baseProps, color: END_TIP_COLOR, segmentIndex: 999, isTip: true },
-      })
-    }
-  }
-
-  return out
-}
+const CRAYON_WIDTH = 2.1
+const CRAYON_OPACITY = 0.45
 
 export default function RouteLayer({
   map,
@@ -250,42 +130,25 @@ export default function RouteLayer({
       freqMap.set(k, (freqMap.get(k) || 0) + 1)
     }
 
-    // CHANGED: build processedFC by exploding LineStrings into absolute-distance colored segments
+    // we count duplicates and style them
     const processedFC = {
-      type: "FeatureCollection",
-      features: (fc.features || []).flatMap((feature, index) => {
+      ...fc,
+      features: (fc.features || []).map((feature, index) => {
         const k = geomKey(feature.geometry)
         const freq = freqMap.get(k) || 1
-
-        if (feature.geometry?.type === "LineString") {
-          const baseProps = {
-            ...feature.properties,
-            gradient: 2,                 // keep your existing props
-            hasFillets: Math.random() > 0.7,
-            routeIndex: index,
-            freq,
+        if (feature.geometry?.type === "LineString" || feature.geometry?.type === "MultiLineString") {
+          return {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              gradient: 2,
+              hasFillets: Math.random() > 0.7, // 70% chance for fillets
+              routeIndex: index,
+              freq,
+            },
           }
-          return explodeLineToAbsoluteBands(feature, baseProps)
         }
-
-        if (feature.geometry?.type === "MultiLineString") {
-          // explode each part
-          const parts = feature.geometry.coordinates || []
-          const baseProps = {
-            ...feature.properties,
-            gradient: 5,
-            hasFillets: Math.random() > 0.7,
-            routeIndex: index,
-            freq,
-          }
-          return parts.flatMap((part) => {
-            const f = { type: "Feature", geometry: { type: "LineString", coordinates: part }, properties: feature.properties || {} }
-            return explodeLineToAbsoluteBands(f, baseProps)
-          })
-        }
-
-        // passthrough others
-        return [{ ...feature, properties: { ...feature.properties, freq } }]
+        return feature
       }),
     }
 
@@ -294,7 +157,7 @@ export default function RouteLayer({
       map.addSource(sourceId, {
         type: "geojson",
         data: processedFC,
-        lineMetrics: true, // harmless to keep
+        lineMetrics: true, // Enable line metrics for gradient support
       })
     } else {
       const src = map.getSource(sourceId)
@@ -305,7 +168,9 @@ export default function RouteLayer({
     const getLineStyle = (importance) => {
       switch (importance) {
         case "very-high":
+          return { width: CRAYON_WIDTH, color: MEDIUM_BLUE, opacity: CRAYON_OPACITY }
         case "high":
+          return { width: CRAYON_WIDTH, color: MEDIUM_BLUE, opacity: CRAYON_OPACITY }
         case "medium":
           return { width: CRAYON_WIDTH, color: MEDIUM_BLUE, opacity: CRAYON_OPACITY }
         case "low":
@@ -332,9 +197,25 @@ export default function RouteLayer({
           "line-miter-limit": 2,
         },
         paint: {
-          // CHANGED: use per-feature color (absolute bands), not line-progress gradient
-          "line-color": ["get", "color"], // ADDED
-          // thickness scales with frequency (your formula retained)
+          "line-gradient": [
+            "interpolate",
+            ["linear"],
+            ["line-progress"],
+            0,
+            LIGHT_BLUE, // Start with light blue
+            0.1,
+            LIGHT_BLUE, // Keep light blue for shorter distance
+            0.2,
+            MEDIUM_BLUE, // Transition to medium blue earlier
+            0.3,
+            DARK_BLUE, // Start dark transition much earlier
+            0.5,
+            ACCENT_BLUE, // Transition to navy earlier
+            1,
+            "#ffffff",
+            // "#2323ff",
+          ],
+          //  thickness scales with frequency (sqrt curve; min 1×)
           "line-width": ["*", lineStyle.width, ["max", 0.2, ["^", ["coalesce", ["get", "freq"], 1], 0.1]]],
           // Slightly increase opacity with frequency
           "line-opacity": [
@@ -374,8 +255,22 @@ export default function RouteLayer({
             "line-miter-limit": 8,
           },
           paint: {
-            // CHANGED: match each segment's color (optional: keep your old gradient if you prefer)
-            "line-color": ["get", "color"], // ADDED
+            "line-gradient": [
+              "interpolate",
+              ["linear"],
+              ["line-progress"],
+              0,
+              LIGHT_BLUE, // Start with light blue
+              0.3,
+              MEDIUM_BLUE, // Transition earlier
+              0.6,
+              DARK_BLUE, // Earlier dark transition
+              0.70,
+              ACCENT_BLUE, // Navy transition
+              1,
+              "#ffffff", // Bright red endpoint for maximum contrast
+            //  " #3D64F6",
+            ],
             // outline also scales with FREQUENCY
             "line-width": ["*", CRAYON_WIDTH + 2.5, ["max", 1, ["^", ["coalesce", ["get", "freq"], 1], 0.5]]],
             "line-opacity": [
@@ -443,7 +338,7 @@ export default function RouteLayer({
           source: pointSourceId,
           paint: {
             "circle-color": LIGHT_BLUE,
-            "circle-radius": 10,
+            "circle-radius": 16,
             "circle-opacity": 0.15,
           },
         })
@@ -457,7 +352,7 @@ export default function RouteLayer({
           source: pointSourceId,
           paint: {
             "circle-color": LIGHT_BLUE,
-            "circle-radius": 8,
+            "circle-radius": 12,
             "circle-opacity": 0.3,
           },
         })
@@ -502,7 +397,7 @@ export default function RouteLayer({
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": "#3D64F6",
+            "circle-color": "#ffffff",
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1, 10, 2, 12, 6, 16, 8],
             "circle-opacity": 0.25,
           },
@@ -516,7 +411,7 @@ export default function RouteLayer({
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": ACCENT_BLUE,
+            "circle-color": "#ffffff",
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 10, 1.5, 12, 4, 16, 8],
             "circle-opacity": 0.3,
           },
@@ -530,7 +425,7 @@ export default function RouteLayer({
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": SDIC_BLUE,
+            "circle-color": "#", // Already correct dark blue
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 10, 1, 12, 2.5, 16, 5],
             "circle-opacity": 0.9,
           },

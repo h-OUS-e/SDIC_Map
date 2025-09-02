@@ -3,10 +3,10 @@
 import maplibregl from "maplibre-gl"
 import { useEffect, useRef, useState } from "react"
 
-const LIGHT_BLUE = "#60a5fa" // Bright electric blue (start color)
-const MEDIUM_BLUE = "#3b82f6" // Medium electric blue
-const DARK_BLUE = "#3D64F6" // Deep blue (end color)
-const ACCENT_BLUE = "#3D64F6" // Navy blue (darkest end)
+const LIGHT_BLUE = "#60a5fa"
+const MEDIUM_BLUE = "#3b82f6"
+const DARK_BLUE = "#3D64F6"
+const ACCENT_BLUE = "#3D64F6"
 const SDIC_BLUE = "#3D64F6"
 const SDIC_PINK = "#BA29BC"
 const SDIC_PURPLE = "#B026FF"
@@ -18,19 +18,9 @@ const MINT_GREEN = "#00FF93"
 const DARK_GREEN = "#138B4F"
 
 const CRAYON_WIDTH = 3.1
-const CRAYON_OPACITY = 0.35
+const CRAYON_OPACITY = 0.85
 
-// --- ADDED: absolute-distance palette (in meters)
-const COLOR_BANDS = [
-  { upto:  500, color: SDIC_BLUE },   
-  { upto:  3000, color: SDIC_BLUE },  
-  { upto: 40000, color: SDIC_BLUE },    
-  { upto: 10000, color: DARK_GREEN }, 
-]
-const END_TIP_METERS = 500         // uniform end tip length for all routes
-const END_TIP_COLOR = MINT_GREEN
-
-// --- ADDED: distance helpers (no deps)
+// distance helpers
 function haversineMeters(a, b) {
   const R = 6371000
   const toRad = (x) => (x * Math.PI) / 180
@@ -50,100 +40,28 @@ function cumulativeMeters(coords) {
   return cum
 }
 
-function pointAtDistance(coords, cum, d) {
-  if (d <= 0) return coords[0]
-  const total = cum[cum.length - 1]
-  if (d >= total) return coords[coords.length - 1]
-  let i = 1
-  while (i < cum.length && cum[i] < d) i++
-  const a = coords[i-1], b = coords[i]
-  const segStart = cum[i-1], segLen = cum[i] - segStart
-  const t = (d - segStart) / segLen
-  return [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t]
-}
-
-function sliceAlongMeters(coords, d0, d1) {
-  const cum = cumulativeMeters(coords)
-  const total = cum[cum.length - 1]
-  const start = Math.max(0, Math.min(d0, total))
-  const end   = Math.max(0, Math.min(d1, total))
-  if (end <= start) return null
-  const out = []
-  out.push(pointAtDistance(coords, cum, start))
-  for (let i = 1; i < coords.length; i++) {
-    const dist = cum[i]
-    if (dist > start && dist < end) out.push(coords[i])
-  }
-  out.push(pointAtDistance(coords, cum, end))
-  return out
-}
-
-function explodeLineToAbsoluteBands(feature, baseProps = {}) {
-  const coords = feature.geometry.coordinates
-  if (!Array.isArray(coords) || coords.length < 2) return []
-  const cum = cumulativeMeters(coords)
-  const total = cum[cum.length - 1]
-
-  const tipLen = Math.min(END_TIP_METERS, total)
-  const tipStart = Math.max(0, total - tipLen)
-  const out = []
-
-  // bands from 0 → tipStart
-  let lastEdge = 0
-  if (tipStart > 0) {
-    for (let i = 0; i < COLOR_BANDS.length; i++) {
-      const bandStart = lastEdge
-      const bandEndAbs = COLOR_BANDS[i].upto
-      const bandEnd = Math.min(bandEndAbs, tipStart)
-      if (bandEnd > bandStart) {
-        const seg = sliceAlongMeters(coords, bandStart, bandEnd)
-        if (seg && seg.length >= 2) {
-          out.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: seg },
-            properties: { ...baseProps, color: COLOR_BANDS[i].color, segmentIndex: i, isTip: false },
-          })
-        }
-        lastEdge = bandEnd
-      }
-      if (lastEdge >= tipStart) break
-      if (i === COLOR_BANDS.length - 1 && lastEdge < tipStart) {
-        const seg = sliceAlongMeters(coords, lastEdge, tipStart)
-        if (seg && seg.length >= 2) {
-          out.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: seg },
-            properties: { ...baseProps, color: COLOR_BANDS[i].color, segmentIndex: i + 1, isTip: false },
-          })
-        }
-        lastEdge = tipStart
-      }
+function totalLengthMeters(geom) {
+  let total = 0
+  if (geom?.type === "LineString") {
+    total = cumulativeMeters(geom.coordinates).at(-1) || 0
+  } else if (geom?.type === "MultiLineString") {
+    for (const part of geom.coordinates || []) {
+      const cum = cumulativeMeters(part)
+      total += cum.at(-1) || 0
     }
   }
-
-  // end tip
-  if (tipLen > 0) {
-    const tipSeg = sliceAlongMeters(coords, tipStart, total)
-    if (tipSeg && tipSeg.length >= 2) {
-      out.push({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: tipSeg },
-        properties: { ...baseProps, color: END_TIP_COLOR, segmentIndex: 999, isTip: true },
-      })
-    }
-  }
-
-  return out
+  return total
 }
+
 
 export default function RouteLayer({
   map,
   url = "/assets/routes/route.geojson",
   sourceId = "saved-route",
-  layerId = "saved-route-line", //origin line?
+  layerId = "saved-route-line",
   opacity = 1.0,
-  onData, //callback to notify after reloading the data
-  fitOnLoad = false, //whether we want to autozoom the route once awe load it
+  onData,
+  fitOnLoad = false,
   routeImportance = "medium",
 }) {
   const [geojson, setGeojson] = useState(null)
@@ -162,46 +80,8 @@ export default function RouteLayer({
         console.error("Failed to load route from URL", e)
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [url])
-
-  useEffect(() => {
-    if (!map) return
-
-    // Create SVG filter for crayon texture
-    //doesnt change anything bs maplibre drawa to canvas not dom elements per layer. this filter is not affecting the gl dom layer
-    const svgFilter = `
-      <svg style="position: absolute; width: 0; height: 0;">
-        <defs>
-          <filter id="crayon-noise" x="0%" y="0%" width="100%" height="100%">
-            <feTurbulence baseFrequency="1.8" numOctaves="4" result="noise" seed="2"/>
-            <feColorMatrix in="noise" type="saturate" values="0"/>
-            <feComponentTransfer>
-              <feFuncA type="discrete" tableValues="0.2 0.3 0.4 0.5 0.6 0.7"/>
-            </feComponentTransfer>
-            <feComposite operator="multiply" in2="SourceGraphic"/>
-          </filter>
-        </defs>
-      </svg>
-    `
-
-    // Add SVG to map container
-    const mapContainer = map.getContainer()
-    let svgElement = mapContainer.querySelector("#crayon-svg-filter")
-    if (!svgElement) {
-      svgElement = document.createElement("div")
-      svgElement.id = "crayon-svg-filter"
-      svgElement.innerHTML = svgFilter
-      mapContainer.appendChild(svgElement)
-    }
-
-    return () => {
-      const element = mapContainer.querySelector("#crayon-svg-filter")
-      if (element) element.remove()
-    }
-  }, [map])
 
   // Add/update MapLibre sources & layers
   useEffect(() => {
@@ -210,111 +90,71 @@ export default function RouteLayer({
     // Ensure FeatureCollection
     const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
 
-    //FREWUENCY ANNOTATION
-    //     Two identical polylines (even if one is reversed) should be considered “the same” segment.
-    const round = (n, p = 6) => Math.round(n * 10 ** p) / 10 ** p
+    // compute gradient start 't' (where last 500 m begins) 
+    // We’ll compute a single total length across all lines to position the tail.
+    let grandTotal = 0
+    for (const f of fc.features || []) grandTotal += totalLengthMeters(f.geometry)
+    const TAIL_METERS = 500
+    const startTailT = Math.max(0, Math.min(1, grandTotal > 0 ? 1 - TAIL_METERS / grandTotal : 1))
 
-    const normLine = (coords) => {
-      const cleaned = []
-      let prev = null
-      for (const c of coords || []) {
-        const rc = [round(c[0]), round(c[1])]
-        if (!prev || rc[0] !== prev[0] || rc[1] !== prev[1]) cleaned.push(rc)
-        prev = rc
-      }
-      if (cleaned.length < 2) return cleaned.concat(cleaned)
-      const f = cleaned.map((c) => `${c[0]},${c[1]}`).join("|")
-      const b = [...cleaned]
-        .reverse()
-        .map((c) => `${c[0]},${c[1]}`)
-        .join("|")
-      return f < b ? f : b // direction-agnostic
-    }
-
-    const normMulti = (multi) => {
-      const parts = (multi || []).map((p) => normLine(p)).filter(Boolean)
-      return parts.sort().join("||")
-    }
-
-    const geomKey = (geom) => {
-      if (!geom) return "NONE"
-      if (geom.type === "LineString") return "L:" + normLine(geom.coordinates)
-      if (geom.type === "MultiLineString") return "ML:" + normMulti(geom.coordinates)
-      return "O:" + JSON.stringify(geom.coordinates)
-    }
-
-    // Count identical geometries
-    const freqMap = new Map()
+    // Extract origin & final endpoint from original features
+    let firstPoint = null
+    let lastPoint = null
     for (const feat of fc.features || []) {
-      const k = geomKey(feat.geometry)
-      freqMap.set(k, (freqMap.get(k) || 0) + 1)
-    }
-
-    // CHANGED: build processedFC by exploding LineStrings into absolute-distance colored segments
-    const processedFC = {
-      type: "FeatureCollection",
-      features: (fc.features || []).flatMap((feature, index) => {
-        const k = geomKey(feature.geometry)
-        const freq = freqMap.get(k) || 1
-
-        if (feature.geometry?.type === "LineString") {
-          const baseProps = {
-            ...feature.properties,
-            gradient: 2,                 // keep your existing props
-            hasFillets: Math.random() > 0.7,
-            routeIndex: index,
-            freq,
+      if (feat.geometry?.type === "LineString" && feat.geometry.coordinates?.length > 0) {
+        if (!firstPoint) firstPoint = feat.geometry.coordinates[0]
+        lastPoint = feat.geometry.coordinates[feat.geometry.coordinates.length - 1]
+      } else if (feat.geometry?.type === "MultiLineString") {
+        for (const part of feat.geometry.coordinates || []) {
+          if (part.length > 0) {
+            if (!firstPoint) firstPoint = part[0]
+            lastPoint = part[part.length - 1]
           }
-          return explodeLineToAbsoluteBands(feature, baseProps)
         }
-
-        if (feature.geometry?.type === "MultiLineString") {
-          // explode each part
-          const parts = feature.geometry.coordinates || []
-          const baseProps = {
-            ...feature.properties,
-            gradient: 5,
-            hasFillets: Math.random() > 0.7,
-            routeIndex: index,
-            freq,
-          }
-          return parts.flatMap((part) => {
-            const f = { type: "Feature", geometry: { type: "LineString", coordinates: part }, properties: feature.properties || {} }
-            return explodeLineToAbsoluteBands(f, baseProps)
-          })
-        }
-
-        // passthrough others
-        return [{ ...feature, properties: { ...feature.properties, freq } }]
-      }),
+      }
     }
+    const origin = firstPoint && firstPoint.length >= 2 ? firstPoint : null
+    const endpoints = lastPoint && lastPoint.length >= 2 ? [lastPoint] : []
 
-    //add/update LINE source
+    // add/update ONE source with lineMetrics enable
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: "geojson",
-        data: processedFC,
-        lineMetrics: true, // harmless to keep
+        data: fc,
+        lineMetrics: true, // REQUIRED for line-gradient + line-progress
       })
     } else {
       const src = map.getSource(sourceId)
-      if (src && src.setData) src.setData(processedFC)
+      src?.setData?.(fc)
     }
 
-    // Determine line style based on route importance
+    //  style by importance 
     const getLineStyle = (importance) => {
       switch (importance) {
         case "very-high":
         case "high":
         case "medium":
-          return { width: CRAYON_WIDTH, color: MEDIUM_BLUE, opacity: CRAYON_OPACITY }
+          return { width: CRAYON_WIDTH, opacity: CRAYON_OPACITY }
         case "low":
         default:
-          return { width: CRAYON_WIDTH, color: MEDIUM_BLUE, opacity: CRAYON_OPACITY }
+          return { width: CRAYON_WIDTH, opacity: CRAYON_OPACITY }
       }
     }
-
     const lineStyle = getLineStyle(routeImportance)
+
+  
+    // Gradient: SDIC blue → darker blue → teal → mint within last 500 m
+    const START_COLOR = SDIC_BLUE          // "#3D64F6"
+    const MID_COLOR_1 = "#253BE2"
+    const MID_COLOR_2 = "#187775"
+    const END_COLOR   = "#24DE8C"
+
+    // Put all gradient stops in line-progress space.
+    // keep a narrow pre-tail flat region to ensure a crisp start of the fade.
+    const t0 = Math.max(0, startTailT - 0.001)
+    const t1 = startTailT + (1 - startTailT) * 0.33
+    const t2 = startTailT + (1 - startTailT) * 0.66
+    const t3 = 1.0
 
     if (!map.getLayer(layerId)) {
       map.addLayer({
@@ -323,44 +163,33 @@ export default function RouteLayer({
         source: sourceId,
         layout: {
           "line-cap": "round",
-          "line-join": [
-            "case",
-            ["get", "hasFillets"],
-            "round", // Rounded joins for fillet effect
-            "miter", // Sharp joins for non-fillet routes
-          ],
-          "line-miter-limit": 2,
+          "line-join": "round",
         },
         paint: {
-          // CHANGED: use per-feature color (absolute bands), not line-progress gradient
-          "line-color": ["get", "color"], // ADDED
-          // thickness scales with frequency (your formula retained)
-          "line-width": ["*", lineStyle.width, ["max", 0.2, ["^", ["coalesce", ["get", "freq"], 1], 0.1]]],
-          // Slightly increase opacity with frequency
-          "line-opacity": [
-            "interpolate",
-            ["linear"],
-            ["coalesce", ["get", "freq"], 1],
-            1,
-            lineStyle.opacity * opacity * 0.95,
-            10,
-            lineStyle.opacity * opacity * 0.9,
-            12,
-            lineStyle.opacity * opacity,
-            12.9,
-            Math.min(1, lineStyle.opacity * opacity * 1.05),
+          // fallback color when gradient isn’t evaluated yet
+          "line-color": START_COLOR,
+          // smooth gradient across the single continuous path
+          "line-gradient": [
+            "interpolate", ["linear"], ["line-progress"],
+            0.0, "#24DE8C",       // vivid green right at start
+            0.05, "#187775",      // teal after 5% of route
+            0.55, "#253BE2",      // dark blue 
+            0.8,  "#ffffff",      // long stretch 
+            // startTailT, "#3D64F6",
+            startTailT, "#ffffff",
+            t1, "#253BE2",
+            t2, "#187775",
+            1.0, "#24DE8C"
           ],
+          "line-width": lineStyle.width / 2,
+          "line-opacity": lineStyle.opacity * opacity,
+          // slight blur removes dotty tile seams / joints
+          "line-blur": 0.55
         },
-      })
-
-      const canvas = map.getCanvas()
-      const layerElements = canvas.parentElement?.querySelectorAll(`[data-layer-id="${layerId}"]`)
-      layerElements?.forEach((element) => {
-        element.style.filter = "url(#crayon-noise)"
       })
     }
 
-    // outline effect
+    //outline and glow
     const outlineLayerId = `${layerId}-outline`
     if (!map.getLayer(outlineLayerId)) {
       map.addLayer(
@@ -370,146 +199,66 @@ export default function RouteLayer({
           source: sourceId,
           layout: {
             "line-cap": "round",
-            "line-join": ["case", ["get", "hasFillets"], "round", "miter"],
-            "line-miter-limit": 8,
+            "line-join": "round",
           },
           paint: {
-            // CHANGED: match each segment's color (optional: keep your old gradient if you prefer)
-            "line-color": ["get", "color"], // ADDED
-            // outline also scales with FREQUENCY
-            "line-width": ["*", CRAYON_WIDTH + 2.5, ["max", 1, ["^", ["coalesce", ["get", "freq"], 1], 0.5]]],
-            "line-opacity": [
+            "line-color": START_COLOR,
+            "line-gradient": [
               "interpolate",
               ["linear"],
-              ["coalesce", ["get", "freq"], 1],
-              10,
-              CRAYON_OPACITY * opacity * 0.25,
-              12,
-              CRAYON_OPACITY * opacity * 0.32,
-              12.9,
-              CRAYON_OPACITY * opacity * 0.4,
+              ["line-progress"],
+              0, START_COLOR,
+              t0, START_COLOR,
+              t1, MID_COLOR_1,
+              t2, MID_COLOR_2,
+              t3, END_COLOR
             ],
+            "line-width": CRAYON_WIDTH + 1.0,
+            "line-opacity": (CRAYON_OPACITY * opacity) * 0.55,
+            "line-blur": 0.8
           },
         },
-        layerId,
-      ) // Place outline behind main line
+        layerId // insert beneath main line
+      )
     }
 
-    //ORIGIN marker: glowy blue circle
-    const origin = (() => {
-      const feat = (fc.features || []).find((x) => x.geometry && x.geometry.type === "LineString")
-      const c = feat && feat.geometry && feat.geometry.coordinates && feat.geometry.coordinates[0]
-      return Array.isArray(c) && c.length >= 2 ? c : null
-    })()
-
-    // ENDPOINT marker: glowy blue circle
-    const endpoints = (() => {
-      const lineFeatures = (fc.features || []).filter((x) => x.geometry && x.geometry.type === "LineString")
-      return lineFeatures
-        .map((feat) => {
-          const coords = feat.geometry.coordinates
-          return coords[coords.length - 1]
-        })
-        .filter((c) => Array.isArray(c) && c.length >= 2)
-    })()
-
+    // origiin and endpoint dots
     const pointSourceId = `${sourceId}-origin-point`
     const endpointSourceId = `${sourceId}-endpoint-point`
 
     if (origin) {
-      const pointFC = {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: origin },
-            properties: {},
-          },
-        ],
-      }
+      const pointFC = { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: origin }, properties: {} }] }
+      if (!map.getSource(pointSourceId)) map.addSource(pointSourceId, { type: "geojson", data: pointFC })
+      else map.getSource(pointSourceId)?.setData(pointFC)
 
-      if (!map.getSource(pointSourceId)) {
-        map.addSource(pointSourceId, { type: "geojson", data: pointFC })
-      } else {
-        const ps = map.getSource(pointSourceId)
-        if (ps && ps.setData) ps.setData(pointFC)
-      }
-
-      // Outer glow layer
       if (!map.getLayer(`${layerId}-origin-glow-outer`)) {
-        map.addLayer({
-          id: `${layerId}-origin-glow-outer`,
-          type: "circle",
-          source: pointSourceId,
-          paint: {
-            "circle-color": LIGHT_BLUE,
-            "circle-radius": 10,
-            "circle-opacity": 0.15,
-          },
-        })
+        map.addLayer({ id: `${layerId}-origin-glow-outer`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 10, "circle-opacity": 0.15 } })
       }
-
-      // Middle glow layer
       if (!map.getLayer(`${layerId}-origin-glow-middle`)) {
-        map.addLayer({
-          id: `${layerId}-origin-glow-middle`,
-          type: "circle",
-          source: pointSourceId,
-          paint: {
-            "circle-color": LIGHT_BLUE,
-            "circle-radius": 8,
-            "circle-opacity": 0.3,
-          },
-        })
+        map.addLayer({ id: `${layerId}-origin-glow-middle`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 8, "circle-opacity": 0.3 } })
       }
-
-      // Core circle
       if (!map.getLayer(`${layerId}-origin-dot`)) {
-        map.addLayer({
-          id: `${layerId}-origin-dot`,
-          type: "circle",
-          source: pointSourceId,
-          paint: {
-            "circle-color": LIGHT_BLUE,
-            "circle-radius": 4,
-            "circle-opacity": 0.9,
-          },
-        })
+        map.addLayer({ id: `${layerId}-origin-dot`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 4, "circle-opacity": 0.9 } })
       }
     }
 
     if (endpoints.length > 0) {
-      const endpointFC = {
-        type: "FeatureCollection",
-        features: endpoints.map((coords, index) => ({
-          type: "Feature",
-          geometry: { type: "Point", coordinates: coords },
-          properties: { endpointIndex: index },
-        })),
-      }
+      const endpointFC = { type: "FeatureCollection", features: endpoints.map((c, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: { endpointIndex: i } })) }
+      if (!map.getSource(endpointSourceId)) map.addSource(endpointSourceId, { type: "geojson", data: endpointFC })
+      else map.getSource(endpointSourceId)?.setData(endpointFC)
 
-      if (!map.getSource(endpointSourceId)) {
-        map.addSource(endpointSourceId, { type: "geojson", data: endpointFC })
-      } else {
-        const ps = map.getSource(endpointSourceId)
-        if (ps && ps.setData) ps.setData(endpointFC)
-      }
-
-      // Outer glow layer for endpoint
       if (!map.getLayer(`${layerId}-endpoint-glow-outer`)) {
         map.addLayer({
           id: `${layerId}-endpoint-glow-outer`,
           type: "circle",
           source: endpointSourceId,
           paint: {
-            "circle-color": "#3D64F6",
+            "circle-color": SDIC_BLUE,
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1, 10, 2, 12, 6, 16, 8],
             "circle-opacity": 0.25,
           },
         })
       }
-
-      // Middle glow layer for endpoint
       if (!map.getLayer(`${layerId}-endpoint-glow-middle`)) {
         map.addLayer({
           id: `${layerId}-endpoint-glow-middle`,
@@ -522,8 +271,6 @@ export default function RouteLayer({
           },
         })
       }
-
-      // Core circle for endpoint
       if (!map.getLayer(`${layerId}-endpoint-dot`)) {
         map.addLayer({
           id: `${layerId}-endpoint-dot`,
@@ -544,16 +291,11 @@ export default function RouteLayer({
         const features = fc.features || []
         const bounds = new maplibregl.LngLatBounds()
         features.forEach((f) => {
-          if (f.geometry?.type === "LineString") {
-            f.geometry.coordinates.forEach((c) => bounds.extend(c))
-          } else if (f.geometry?.type === "MultiLineString") {
-            f.geometry.coordinates.flat().forEach((c) => bounds.extend(c))
-          }
+          if (f.geometry?.type === "LineString") f.geometry.coordinates.forEach((c) => bounds.extend(c))
+          else if (f.geometry?.type === "MultiLineString") f.geometry.coordinates.flat().forEach((c) => bounds.extend(c))
         })
         if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, duration: 900 })
-      } catch (e) {
-        // ignore
-      }
+      } catch {}
     }
 
     // cleanup
@@ -565,14 +307,11 @@ export default function RouteLayer({
         `${layerId}-origin-dot`,
         `${layerId}-origin-glow-middle`,
         `${layerId}-origin-glow-outer`,
-        layerId,
         outlineLayerId,
-      ].forEach((id) => {
-        if (map.getLayer(id)) map.removeLayer(id)
-      })
-      // remove sources
-      if (map.getSource(endpointSourceId)) map.removeSource(endpointSourceId)
+        layerId,
+      ].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id) })
       if (map.getSource(`${sourceId}-origin-point`)) map.removeSource(`${sourceId}-origin-point`)
+      if (map.getSource(`${sourceId}-endpoint-point`)) map.removeSource(`${sourceId}-endpoint-point`)
       if (map.getSource(sourceId)) map.removeSource(sourceId)
     }
   }, [map, geojson, sourceId, layerId, opacity, fitOnLoad, routeImportance])
@@ -583,11 +322,7 @@ export default function RouteLayer({
     const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
     if (lastSentRef.current !== fc) {
       lastSentRef.current = fc
-      try {
-        onData && onData(fc)
-      } catch (e) {
-        console.warn("onData threw:", e)
-      }
+      try { onData && onData(fc) } catch (e) { console.warn("onData threw:", e) }
     }
   }, [geojson, onData])
 
@@ -599,7 +334,6 @@ export default function RouteLayer({
       const text = await file.text()
       const data = JSON.parse(text)
       setGeojson(data)
-
       const fc = data && data.type === "FeatureCollection" ? data : { type: "FeatureCollection", features: [data] }
       lastSentRef.current = fc
       if (onData) onData(fc)

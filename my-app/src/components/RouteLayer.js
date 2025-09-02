@@ -1,306 +1,364 @@
-'use client';
+"use client"
 
-import maplibregl from 'maplibre-gl';
-import React, { useEffect, useRef, useState } from 'react';
+import maplibregl from "maplibre-gl"
+import { useEffect, useRef, useState } from "react"
+
+const LIGHT_BLUE = "#60a5fa"
+const MEDIUM_BLUE = "#3b82f6"
+const DARK_BLUE = "#3D64F6"
+const ACCENT_BLUE = "#3D64F6"
+const SDIC_BLUE = "#3D64F6"
+const SDIC_PINK = "#BA29BC"
+const SDIC_PURPLE = "#B026FF"
+const BRIGHT_RED = "#ff6b6b"
+const NEON_BLUE = "#2323ff"
+const WHITE = "#ffffff"
+const NEON_GREEN = "#39FF14"
+const MINT_GREEN = "#00FF93"
+const DARK_GREEN = "#138B4F"
+
+const CRAYON_WIDTH = 3.1
+const CRAYON_OPACITY = 0.85
+
+// distance helpers
+function haversineMeters(a, b) {
+  const R = 6371000
+  const toRad = (x) => (x * Math.PI) / 180
+  const [lon1, lat1] = a, [lon2, lat2] = b
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const la1 = toRad(lat1), la2 = toRad(lat2)
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+function cumulativeMeters(coords) {
+  const cum = [0]
+  for (let i = 1; i < coords.length; i++) {
+    cum.push(cum[i-1] + haversineMeters(coords[i-1], coords[i]))
+  }
+  return cum
+}
+
+function totalLengthMeters(geom) {
+  let total = 0
+  if (geom?.type === "LineString") {
+    total = cumulativeMeters(geom.coordinates).at(-1) || 0
+  } else if (geom?.type === "MultiLineString") {
+    for (const part of geom.coordinates || []) {
+      const cum = cumulativeMeters(part)
+      total += cum.at(-1) || 0
+    }
+  }
+  return total
+}
+
 
 export default function RouteLayer({
-    map,
-    url = '/assets/routes/route.geojson',
-    sourceId = 'saved-route',
-    layerId = 'saved-route-line',
-    opacity = 0.3
+  map,
+  url = "/assets/routes/route.geojson",
+  sourceId = "saved-route",
+  layerId = "saved-route-line",
+  opacity = 1.0,
+  onData,
+  fitOnLoad = false,
+  routeImportance = "medium",
 }) {
-    const [geojson, setGeojson] = useState(null);
-    const popupRef = useRef(null);
-    console.log("TEST", url)
+  const [geojson, setGeojson] = useState(null)
+  const lastSentRef = useRef(null)
 
-    // helpers
-    const escapeHtml = (s) =>
-        String(s ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+  // Load from URL
+  useEffect(() => {
+    let cancelled = false
+    if (!url) return
+    ;(async () => {
+      try {
+        const res = await fetch(url)
+        const data = await res.json()
+        if (!cancelled) setGeojson(data)
+      } catch (e) {
+        console.error("Failed to load route from URL", e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [url])
 
-    const fmtLatLng = (lng, lat) =>
-        `${lat?.toFixed?.(5) ?? lat}, ${lng?.toFixed?.(5) ?? lng}`;
+  // Add/update MapLibre sources & layers
+  useEffect(() => {
+    if (!map || !geojson) return
 
-    const pickToAddress = (props = {}) =>
-        props.to ?? props.to_address ?? props.destination ?? props.end ?? props.name ?? null;
+    // Ensure FeatureCollection
+    const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
 
-    // register triangle once
-    useEffect(() => {
-        if (!map) return;
-        const imageName = 'route-start-triangle';
-        if (map.hasImage && map.hasImage(imageName)) return;
-        const size = 48;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, size, size);
-        ctx.beginPath();
-        ctx.moveTo(size / 2, 6);
-        ctx.lineTo(6, size - 6);
-        ctx.lineTo(size - 6, size - 6);
-        ctx.closePath();
-        ctx.fillStyle = '#00c853';
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = 'white';
-        ctx.stroke();
-        const imageData = ctx.getImageData(0, 0, size, size);
-        try { map.addImage(imageName, imageData, { pixelRatio: 2 }); } catch {}
-    }, [map]);
+    // compute gradient start 't' (where last 500 m begins) 
+    // We’ll compute a single total length across all lines to position the tail.
+    let grandTotal = 0
+    for (const f of fc.features || []) grandTotal += totalLengthMeters(f.geometry)
+    const TAIL_METERS = 500
+    const startTailT = Math.max(0, Math.min(1, grandTotal > 0 ? 1 - TAIL_METERS / grandTotal : 1))
 
-    // load from URL
-    useEffect(() => {
-        let cancelled = false;
-        if (!url) return;
-        (async () => {
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                if (!cancelled) setGeojson(data);
-            } catch (e) {
-                console.error('Failed to load route from URL', e);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [url]);
-
-    // layers
-    useEffect(() => {
-        if (!map || !geojson) return;
-
-        const fc = geojson.type === 'FeatureCollection'
-        ? geojson
-        : { type: 'FeatureCollection', features: [geojson] };
-
-        // route lines
-        if (!map.getSource(sourceId)) {
-            map.addSource(sourceId, { type: 'geojson', data: fc });
-            map.addLayer({
-                id: layerId,
-                type: 'line',
-                source: sourceId,
-                paint: {
-                'line-color': '#3838f2',
-                'line-width': 5,
-                'line-opacity': opacity
-                }
-            });
-        } else {
-            const src = map.getSource(sourceId);
-            if (src?.setData) src.setData(fc);
+    // Extract origin & final endpoint from original features
+    let firstPoint = null
+    let lastPoint = null
+    for (const feat of fc.features || []) {
+      if (feat.geometry?.type === "LineString" && feat.geometry.coordinates?.length > 0) {
+        if (!firstPoint) firstPoint = feat.geometry.coordinates[0]
+        lastPoint = feat.geometry.coordinates[feat.geometry.coordinates.length - 1]
+      } else if (feat.geometry?.type === "MultiLineString") {
+        for (const part of feat.geometry.coordinates || []) {
+          if (part.length > 0) {
+            if (!firstPoint) firstPoint = part[0]
+            lastPoint = part[part.length - 1]
+          }
         }
+      }
+    }
+    const origin = firstPoint && firstPoint.length >= 2 ? firstPoint : null
+    const endpoints = lastPoint && lastPoint.length >= 2 ? [lastPoint] : []
 
-        // starts/ends + bounds
-        const starts = [];
-        const ends = [];
-        const bounds = new maplibregl.LngLatBounds();
+    // add/update ONE source with lineMetrics enable
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: fc,
+        lineMetrics: true, // REQUIRED for line-gradient + line-progress
+      })
+    } else {
+      const src = map.getSource(sourceId)
+      src?.setData?.(fc)
+    }
 
-        let lineIdx = 0;
-        (fc.features || []).forEach((f) => {
-            const g = f.geometry;
-            if (!g) return;
+    //  style by importance 
+    const getLineStyle = (importance) => {
+      switch (importance) {
+        case "very-high":
+        case "high":
+        case "medium":
+          return { width: CRAYON_WIDTH, opacity: CRAYON_OPACITY }
+        case "low":
+        default:
+          return { width: CRAYON_WIDTH, opacity: CRAYON_OPACITY }
+      }
+    }
+    const lineStyle = getLineStyle(routeImportance)
 
-            const addLine = (coords) => {
-                if (!Array.isArray(coords) || coords.length < 1) return;
-                coords.forEach((c) => bounds.extend(c));
-                const start = coords[0];
-                const end = coords[coords.length - 1];
+  
+    // Gradient: SDIC blue → darker blue → teal → mint within last 500 m
+    const START_COLOR = SDIC_BLUE          // "#3D64F6"
+    const MID_COLOR_1 = "#253BE2"
+    const MID_COLOR_2 = "#187775"
+    const END_COLOR   = "#24DE8C"
 
-                // pull fields from your properties
-                const p = f.properties || {};
-                const to = pickToAddress(p);
-                const original_to = p.original_to ?? p.originalTo ?? null;
-                const month = p.month ?? null;
-                const activity = p.activity ?? null;
-                const profile = p.profile ?? p.mode ?? null;
+    // Put all gradient stops in line-progress space.
+    // keep a narrow pre-tail flat region to ensure a crisp start of the fade.
+    const t0 = Math.max(0, startTailT - 0.001)
+    const t1 = startTailT + (1 - startTailT) * 0.33
+    const t2 = startTailT + (1 - startTailT) * 0.66
+    const t3 = 1.0
 
-                starts.push({
-                type: 'Feature',
-                properties: { idx: lineIdx },
-                geometry: { type: 'Point', coordinates: start }
-                });
+    if (!map.getLayer(layerId)) {
+      map.addLayer({
+        id: layerId,
+        type: "line",
+        source: sourceId,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          // fallback color when gradient isn’t evaluated yet
+          "line-color": START_COLOR,
+          // smooth gradient across the single continuous path
+          "line-gradient": [
+            "interpolate", ["linear"], ["line-progress"],
+            0.0, "#24DE8C",       // vivid green right at start
+            0.05, "#187775",      // teal after 5% of route
+            0.55, "#253BE2",      // dark blue 
+            0.8,  "#ffffff",      // long stretch 
+            // startTailT, "#3D64F6",
+            startTailT, "#ffffff",
+            t1, "#253BE2",
+            t2, "#187775",
+            1.0, "#24DE8C"
+          ],
+          "line-width": lineStyle.width / 2,
+          "line-opacity": lineStyle.opacity * opacity,
+          // slight blur removes dotty tile seams / joints
+          "line-blur": 0.55
+        },
+      })
+    }
 
-                ends.push({
-                type: 'Feature',
-                properties: {
-                    idx: lineIdx,
-                    to: to ?? '',
-                    original_to: original_to ?? '',
-                    month: month ?? '',
-                    activity: activity ?? '',
-                    profile: profile ?? ''
-                },
-                geometry: { type: 'Point', coordinates: end }
-                });
+    //outline and glow
+    const outlineLayerId = `${layerId}-outline`
+    if (!map.getLayer(outlineLayerId)) {
+      map.addLayer(
+        {
+          id: outlineLayerId,
+          type: "line",
+          source: sourceId,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": START_COLOR,
+            "line-gradient": [
+              "interpolate",
+              ["linear"],
+              ["line-progress"],
+              0, START_COLOR,
+              t0, START_COLOR,
+              t1, MID_COLOR_1,
+              t2, MID_COLOR_2,
+              t3, END_COLOR
+            ],
+            "line-width": CRAYON_WIDTH + 1.0,
+            "line-opacity": (CRAYON_OPACITY * opacity) * 0.55,
+            "line-blur": 0.8
+          },
+        },
+        layerId // insert beneath main line
+      )
+    }
 
-                lineIdx += 1;
-            };
+    // origiin and endpoint dots
+    const pointSourceId = `${sourceId}-origin-point`
+    const endpointSourceId = `${sourceId}-endpoint-point`
 
-            if (g.type === 'LineString') addLine(g.coordinates);
-            else if (g.type === 'MultiLineString') g.coordinates.forEach(addLine);
-        });
+    if (origin) {
+      const pointFC = { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: origin }, properties: {} }] }
+      if (!map.getSource(pointSourceId)) map.addSource(pointSourceId, { type: "geojson", data: pointFC })
+      else map.getSource(pointSourceId)?.setData(pointFC)
 
-        try { if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, duration: 900 }); } catch {}
+      if (!map.getLayer(`${layerId}-origin-glow-outer`)) {
+        map.addLayer({ id: `${layerId}-origin-glow-outer`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 10, "circle-opacity": 0.15 } })
+      }
+      if (!map.getLayer(`${layerId}-origin-glow-middle`)) {
+        map.addLayer({ id: `${layerId}-origin-glow-middle`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 8, "circle-opacity": 0.3 } })
+      }
+      if (!map.getLayer(`${layerId}-origin-dot`)) {
+        map.addLayer({ id: `${layerId}-origin-dot`, type: "circle", source: pointSourceId, paint: { "circle-color": LIGHT_BLUE, "circle-radius": 4, "circle-opacity": 0.9 } })
+      }
+    }
 
-        // start triangles
-        const startSourceId = `${sourceId}-starts`;
-        const startLayerId = `${layerId}-starts`;
-        const startFC = { type: 'FeatureCollection', features: starts };
+    if (endpoints.length > 0) {
+      const endpointFC = { type: "FeatureCollection", features: endpoints.map((c, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: { endpointIndex: i } })) }
+      if (!map.getSource(endpointSourceId)) map.addSource(endpointSourceId, { type: "geojson", data: endpointFC })
+      else map.getSource(endpointSourceId)?.setData(endpointFC)
 
-        if (starts.length) {
-            if (!map.getSource(startSourceId)) map.addSource(startSourceId, { type: 'geojson', data: startFC });
-            else map.getSource(startSourceId)?.setData(startFC);
+      if (!map.getLayer(`${layerId}-endpoint-glow-outer`)) {
+        map.addLayer({
+          id: `${layerId}-endpoint-glow-outer`,
+          type: "circle",
+          source: endpointSourceId,
+          paint: {
+            "circle-color": SDIC_BLUE,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1, 10, 2, 12, 6, 16, 8],
+            "circle-opacity": 0.25,
+          },
+        })
+      }
+      if (!map.getLayer(`${layerId}-endpoint-glow-middle`)) {
+        map.addLayer({
+          id: `${layerId}-endpoint-glow-middle`,
+          type: "circle",
+          source: endpointSourceId,
+          paint: {
+            "circle-color": ACCENT_BLUE,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 10, 1.5, 12, 4, 16, 8],
+            "circle-opacity": 0.3,
+          },
+        })
+      }
+      if (!map.getLayer(`${layerId}-endpoint-dot`)) {
+        map.addLayer({
+          id: `${layerId}-endpoint-dot`,
+          type: "circle",
+          source: endpointSourceId,
+          paint: {
+            "circle-color": SDIC_BLUE,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 10, 1, 12, 2.5, 16, 5],
+            "circle-opacity": 0.9,
+          },
+        })
+      }
+    }
 
-            if (!map.getLayer(startLayerId)) {
-                map.addLayer({
-                    id: startLayerId,
-                    type: 'symbol',
-                    source: startSourceId,
-                    layout: {
-                        'icon-image': 'route-start-triangle',
-                        'icon-size': 0.8,
-                        'icon-allow-overlap': true
-                    }
-                });
-            }
+    // Optional fit to bounds
+    if (fitOnLoad) {
+      try {
+        const features = fc.features || []
+        const bounds = new maplibregl.LngLatBounds()
+        features.forEach((f) => {
+          if (f.geometry?.type === "LineString") f.geometry.coordinates.forEach((c) => bounds.extend(c))
+          else if (f.geometry?.type === "MultiLineString") f.geometry.coordinates.flat().forEach((c) => bounds.extend(c))
+        })
+        if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, duration: 900 })
+      } catch {}
+    }
 
-        } else {
-            if (map.getLayer(startLayerId)) map.removeLayer(startLayerId);
-            if (map.getSource(startSourceId)) map.removeSource(startSourceId);
-        }
+    // cleanup
+    return () => {
+      ;[
+        `${layerId}-endpoint-dot`,
+        `${layerId}-endpoint-glow-middle`,
+        `${layerId}-endpoint-glow-outer`,
+        `${layerId}-origin-dot`,
+        `${layerId}-origin-glow-middle`,
+        `${layerId}-origin-glow-outer`,
+        outlineLayerId,
+        layerId,
+      ].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id) })
+      if (map.getSource(`${sourceId}-origin-point`)) map.removeSource(`${sourceId}-origin-point`)
+      if (map.getSource(`${sourceId}-endpoint-point`)) map.removeSource(`${sourceId}-endpoint-point`)
+      if (map.getSource(sourceId)) map.removeSource(sourceId)
+    }
+  }, [map, geojson, sourceId, layerId, opacity, fitOnLoad, routeImportance])
 
-        // end circles
-        const endSourceId = `${sourceId}-ends`;
-        const endLayerId = `${layerId}-ends`;
-        const endFC = { type: 'FeatureCollection', features: ends };
+  // Notify parent once per dataset change
+  useEffect(() => {
+    if (!geojson) return
+    const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
+    if (lastSentRef.current !== fc) {
+      lastSentRef.current = fc
+      try { onData && onData(fc) } catch (e) { console.warn("onData threw:", e) }
+    }
+  }, [geojson, onData])
 
-        if (ends.length) {
-            if (!map.getSource(endSourceId)) map.addSource(endSourceId, { type: 'geojson', data: endFC });
-            else map.getSource(endSourceId)?.setData(endFC);
+  // Local file loader
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      setGeojson(data)
+      const fc = data && data.type === "FeatureCollection" ? data : { type: "FeatureCollection", features: [data] }
+      lastSentRef.current = fc
+      if (onData) onData(fc)
+    } catch (err) {
+      console.error("Invalid GeoJSON file", err)
+      alert("Invalid GeoJSON file")
+    }
+  }
 
-            if (!map.getLayer(endLayerId)) {
-                map.addLayer({
-                    id: endLayerId,
-                    type: 'circle',
-                    source: endSourceId,
-                    paint: {
-                        'circle-radius': 7,
-                        'circle-color': '#ff5252',
-                        'circle-stroke-color': 'white',
-                        'circle-stroke-width': 2,
-                        'circle-opacity': 0.95
-                    }
-                });
-            }
-        } else {
-            if (map.getLayer(endLayerId)) map.removeLayer(endLayerId);
-            if (map.getSource(endSourceId)) map.removeSource(endSourceId);
-        }
-
-        // popup
-        if (!popupRef.current) {
-            popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
-        }
-
-        const onEnter = (e) => {
-            map.getCanvas().style.cursor = 'pointer';
-            const feat = e.features?.[0];
-            const p = feat?.properties || {};
-            const [lng, lat] = feat?.geometry?.coordinates || [];
-
-            // Build rows only for present values
-            const rows = [];
-            const addRow = (label, val) => {
-                if (!val || !`${val}`.trim()) return;
-                rows.push(
-                `<div style="margin:2px 0"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</div>`
-                );
-            };
-
-            addRow('To', p.to);
-            addRow('Original To', p.original_to);
-            addRow('Month', p.month);
-            addRow('Activity', p.activity);
-            addRow('Profile', p.profile);
-
-            if (!rows.length) {
-                rows.push(
-                `<div style="margin:2px 0"><strong>To (coords):</strong> ${escapeHtml(fmtLatLng(lng, lat))}</div>`
-                );
-            }
-
-            popupRef.current
-                .setLngLat(e.lngLat)
-                .setHTML(
-                `<div style="color:#111; font: 500 13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                    ${rows.join('')}
-                </div>`
-                ).addTo(map);
-        };
-
-        const onMove = (e) => popupRef.current?.setLngLat(e.lngLat);
-        const onLeave = () => { map.getCanvas().style.cursor = ''; popupRef.current?.remove(); };
-
-        if (map.getLayer(endLayerId)) {
-            map.on('mouseenter', endLayerId, onEnter);
-            map.on('mousemove', endLayerId, onMove);
-            map.on('mouseleave', endLayerId, onLeave);
-        }
-
-        // cleanup
-        return () => {
-            if (map.getLayer(endLayerId)) {
-                map.off('mouseenter', endLayerId, onEnter);
-                map.off('mousemove', endLayerId, onMove);
-                map.off('mouseleave', endLayerId, onLeave);
-            }
-            popupRef.current?.remove();
-
-            if (map.getLayer(startLayerId)) map.removeLayer(startLayerId);
-            if (map.getSource(startSourceId)) map.removeSource(startSourceId);
-            if (map.getLayer(endLayerId)) map.removeLayer(endLayerId);
-            if (map.getSource(endSourceId)) map.removeSource(endSourceId);
-            if (map.getLayer(layerId)) map.removeLayer(layerId);
-            if (map.getSource(sourceId)) map.removeSource(sourceId);
-        };
-    }, [map, geojson, sourceId, layerId, opacity]);
-
-    // Local file loader
-    const onFile = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        try {
-            const text = await file.text();
-            const data = JSON.parse(text);
-            setGeojson(data);
-        } catch (err) {
-            console.error('Invalid GeoJSON file', err);
-            alert('Invalid GeoJSON file');
-        }
-    };
-
-    return (
-        <div
-            style={{
-                position: 'absolute',
-                bottom: 20,
-                right: 20,
-                zIndex: 2,
-                background: 'rgba(20,20,20,0.85)',
-                color: 'white',
-                padding: 12,
-                border: '1px solid #444',
-                borderRadius: 8
-            }}
-        >
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved routes</div>
-            <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
-        </div>
-    );
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 20,
+        right: 20,
+        zIndex: 2,
+        background: "rgba(20,20,20,0.85)",
+        color: "white",
+        padding: 12,
+        border: "1px solid #444",
+        borderRadius: 8,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route</div>
+      <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
+    </div>
+  )
 }

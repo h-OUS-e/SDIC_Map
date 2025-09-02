@@ -4,20 +4,29 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
-import RouteLayer from './RouteLayer'; // Import the new component
-const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
+import RouteLayer from './RouteLayer';
+import RouteLayerWithFrequency from "./RouteLayerWithFrequency";
 
+// [TRIPS ADD]
+import { toTripsData } from '../utils/prepareTrips';
+import TripsOverlay from './TripsOverlay';
+
+const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 
 export default function Map() {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const [API_KEY] = useState(MAPTILER_API_KEY);
+    const [visualizationMode, setVisualizationMode] = useState("offset"); 
     
     // State to track the current view (true = Bay Area, false = SF)
     const [isZoomedOut, setIsZoomedOut] = useState(false);
 
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+    // [TRIPS ADD] animated trips data
+    const [trips, setTrips] = useState([]);
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -115,6 +124,17 @@ export default function Map() {
         setIsZoomedOut(!isZoomedOut);
     };
 
+    // receive GeoJSON from RouteLayer; convert to trips
+    const handleGeojson = (fc) => {
+        try {
+            const t = toTripsData(fc); // -> [{ path, timestamps, color }]
+            setTrips(t);
+            console.log(`[Trips] prepared ${t.length} routes`);
+        } catch (e) {
+            console.error('Failed to prepare trips', e);
+        }
+    };
+
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             {/* A Switch button to toggle between SF zoom in and out.*/}
@@ -150,7 +170,7 @@ export default function Map() {
                 borderRadius: '6px',
                 fontFamily: 'monospace',
                 fontSize: '13px',
-                pointerEvents: 'none', // don't block map interactions
+                pointerEvents: 'none', 
                 lineHeight: 1.3,
                 whiteSpace: 'nowrap',
                 }}
@@ -166,7 +186,20 @@ export default function Map() {
             />
             {isMapLoaded && (
                 <>
-                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" />
+                    {/* camera stable by disabling fit; expose data upward */}
+                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} />
+
+                    {/* {map.current && trips.length > 0 && (
+                        <TripsOverlay
+                            map={map.current}
+                            data={trips}
+                            speed={10.8}    // tweak freely
+                            trail={900}
+                            opacity={0.25}
+                            lineWidth={3.1}
+                        />
+                    )} */}
+
                     <RouteGenerator map={map.current} apiKey={API_KEY} />
                 </>                 
             )}

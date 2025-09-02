@@ -18,6 +18,9 @@ export default function Map() {
     const map = useRef(null);
     const [API_KEY] = useState(MAPTILER_API_KEY);
     const [visualizationMode, setVisualizationMode] = useState("offset"); 
+
+    const [showSmoothed, setShowSmoothed] = useState(true);
+    const toggleSmoothed = () => setShowSmoothed(s => !s);
     
     // State to track the current view (true = Bay Area, false = SF)
     const [isZoomedOut, setIsZoomedOut] = useState(false);
@@ -157,6 +160,27 @@ export default function Map() {
                 {isZoomedOut ? 'Zoom to San Francisco' : 'Zoom to Bay Area'}
             </button>
 
+            {/* Smoothed/original toggle */}
+            <button
+                onClick={toggleSmoothed}
+                aria-pressed={showSmoothed}
+                style={{
+                    position: 'absolute',
+                    top: '60px',            // stacked below the first button
+                    left: '20px',
+                    zIndex: 1,
+                    padding: '10px 15px',
+                    backgroundColor: showSmoothed ? '#3b82f6' : '#333',
+                    color: 'white',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                }}
+                >
+                {showSmoothed ? 'Show Original' : 'Show Smooth'}
+            </button>
+
             {/* on-map readout */}
             <div
                 style={{
@@ -187,18 +211,18 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} />
+                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
-                    {/* {map.current && trips.length > 0 && (
+                    {map.current && trips.length > 0 && (
                         <TripsOverlay
                             map={map.current}
                             data={trips}
                             speed={10.8}    // tweak freely
                             trail={900}
-                            opacity={0.25}
+                            opacity={0.5}
                             lineWidth={3.1}
                         />
-                    )} */}
+                    )}
 
                     <RouteGenerator map={map.current} apiKey={API_KEY} />
                 </>                 

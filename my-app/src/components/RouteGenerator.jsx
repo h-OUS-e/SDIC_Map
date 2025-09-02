@@ -177,7 +177,7 @@ async function routeGoogle(a, b, profile) {
     <div
       style={{
         position: 'absolute',
-        bottom: 20,
+        bottom: 60,
         left: 20,
         zIndex: 2,
         background: 'rgba(20,20,20,0.85)',

@@ -7,8 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 // Colors
 const LIGHT_BLUE = "#60a5fa"
 const MEDIUM_BLUE = "#3b82f6"
-const DARK_BLUE = "#3D64F6"
-const ACCENT_BLUE = "#3D64F6"
 const SDIC_BLUE = "#3D64F6"
 const SDIC_PINK = "#BA29BC"
 const SDIC_PURPLE = "#B026FF"
@@ -20,9 +18,18 @@ const MINT_GREEN = "#00FF93"
 const DARK_GREEN = "#138B4F"
 
 // Parameters
-const CRAYON_WIDTH = 3.1
-const CRAYON_OPACITY = 0.85
+const CRAYON_WIDTH = 5.1
+const CRAYON_OPACITY = .6
+const START_COLOR = NEON_GREEN;
+const MID_COLOR = "#235382";
+const END_COLOR = NEON_BLUE;
+const head_t = 10;
+const tail_t = 10;
+const inner_head_t = 1000;
+const inner_tail_t = 1000;
 
+const showVertices = false;
+const showGradientVertices = false;
 
 // Distance helpers
 
@@ -48,6 +55,7 @@ function cumulativeMeters(coords) {
     return cum
 }
 
+
 /** Total length (m) of a GeoJSON LineString or MultiLineString. */
 function totalLengthMeters(geom) {
     let total = 0
@@ -67,32 +75,138 @@ function totalLengthMeters(geom) {
 const asFC = (g) =>
     g?.type === "FeatureCollection" ? g : { type: "FeatureCollection", features: [g] };
 
-function gradientStartT(fc, tailMeters = 500) {
-    let total = 0;
-    for (const f of fc.features || []) total += totalLengthMeters(f.geometry);
-    if (total <= 0) return 1;
-    return Math.max(0, Math.min(1, 1 - tailMeters / total));
+function computeStopsForGeometry(geom, {
+    // outer "manual" head/tail -> t1, t5
+    headMeters = 500,
+    tailMeters = 500,
+
+    // inner "manual" head/tail -> t2, t4
+    innerHeadMeters = 1000,
+    innerTailMeters = 1000,
+
+    // minimum normalized gap between neighboring stops
+    minGapT = 1e-4,
+} = {}) {
+
+    const total = totalLengthMeters(geom) || 0;
+    const t0 = 0, t6 = 1;
+
+    // Degenerate geometry: keep everything sane and ordered.
+    if (!(total > 0)) {
+        return {
+            t0, t1: 0, t2: 0, t3: 0.5, t4: 1, t5: 1, t6,
+            totalMeters: 0
+        };
+    }
+    
+    const clamp01 = v => Math.max(0, Math.min(1, v));
+
+    // 1) Outer band (t1, t5) from head/tail ---
+    let headT1 = clamp01(headMeters / total);
+    let tailT1 = clamp01(tailMeters / total);
+
+    // Ensure head+tail leave at least 2*minGapT of middle.
+    const maxOuterBudget = Math.max(0, 1 - 2 * minGapT);
+    const usedOuter = headT1 + tailT1;
+    if (usedOuter > maxOuterBudget) {
+        const s = maxOuterBudget / usedOuter;
+        headT1 *= s;
+        tailT1 *= s;
+    }
+
+    let t1 = headT1;
+    let t5 = 1 - tailT1;
+
+    // If t1/t5 still collide, pinch them to a tiny valid band around their midpoint.
+    if (t5 <= t1 + 2 * minGapT) {
+        const mid = (t1 + t5) / 2;
+        t1 = clamp01(mid - minGapT);
+        t5 = clamp01(mid + minGapT);
+    }
+
+    // 2) Inner band (t2, t4) from inner head/tail, then fit inside (t1, t5) ---
+    let headT2 = clamp01(innerHeadMeters / total);
+    let tailT2 = clamp01(innerTailMeters / total);
+
+    // Available normalized budget for (head2 + tail2) inside [t1, t5] after reserving min gaps around t2/t4.
+    const innerWindow = t5 - t1;
+    const maxInnerBudget = Math.max(0, innerWindow - 2 * minGapT);
+
+    const usedInner = headT2 + tailT2;
+    if (usedInner > maxInnerBudget) {
+        // Scale inner head/tail proportionally to fit the available window.
+        const s = maxInnerBudget / (usedInner || 1);
+        headT2 *= s;
+        tailT2 *= s;
+    }
+
+    // Place t2, t4 from global 0/1 but clamp to [t1+minGapT, t5-minGapT]
+    let t2 = Math.max(t1 + minGapT, headT2);
+    let t4 = Math.min(t5 - minGapT, 1 - tailT2);
+
+    // If they still collide or invert, center them within (t1, t5) with min gap.
+    if (t4 <= t2 + 2 * minGapT) {
+        const mid = (t1 + t5) / 2;
+        t2 = Math.max(t1 + minGapT, mid - minGapT);
+        t4 = Math.min(t5 - minGapT, mid + minGapT);
+    }
+
+    // 3) Midpoint ---
+    const t3 = (t2 + t4) / 2;
+
+    return {
+        t0, t1, t2, t3, t4, t5, t6,
+        totalMeters: total
+    };
+
 }
 
-function endpointsFromFC(fc) {
-    let first = null;
-    let last = null;
-    for (const feat of fc.features || []) {
-        const g = feat.geometry;
-        if (!g) continue;
-        if (g.type === "LineString" && g.coordinates?.length) {
-            if (!first) first = g.coordinates[0];
-            last = g.coordinates[g.coordinates.length - 1];
-        } else if (g.type === "MultiLineString") {
-            for (const part of g.coordinates || []) {
-                if (part?.length) {
-                if (!first) first = part[0];
-                    last = part[part.length - 1];
-                }
-            }
-        }
+
+/** Linear interpolate between two [lon,lat] coords */
+function lerpCoord(a, b, t) {
+  const [ax, ay] = a, [bx, by] = b;
+  return [ax + (bx - ax) * t, ay + (by - ay) * t];
+}
+
+/** Coordinate at distance (m) along a LineString coordinate array */
+function coordAtDistanceOnLine(coords, distM) {
+  if (!coords?.length) return null;
+  if (distM <= 0) return coords[0];
+  let run = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const seg = haversineMeters(coords[i], coords[i+1]);
+    if (run + seg >= distM) {
+      const t = seg > 0 ? (distM - run) / seg : 0;
+      return lerpCoord(coords[i], coords[i+1], t);
     }
-    return { origin: first, endpoints: last ? [last] : [] };
+    run += seg;
+  }
+  return coords[coords.length - 1];
+}
+
+/** Coordinate at global fraction t ∈ [0,1] along a LineString or MultiLineString */
+function coordAtT(geom, t) {
+  if (!geom) return null;
+  const total = totalLengthMeters(geom);
+  if (!(total > 0)) return null;
+  const dist = Math.max(0, Math.min(1, t)) * total;
+
+  if (geom.type === "LineString") {
+    return coordAtDistanceOnLine(geom.coordinates, dist);
+  } else if (geom.type === "MultiLineString") {
+    let acc = 0;
+    for (const part of geom.coordinates || []) {
+      const len = (cumulativeMeters(part).at(-1) || 0);
+      if (acc + len >= dist) {
+        const within = dist - acc;
+        return coordAtDistanceOnLine(part, within);
+      }
+      acc += len;
+    }
+    const last = geom.coordinates?.[geom.coordinates.length - 1];
+    return last?.[last.length - 1] || null;
+  }
+  return null;
 }
 
 
@@ -145,40 +259,40 @@ function ensurePointLayer(map, id, sourceId, paint) {
  *  Caps to ~maxPoints by sampling with a stride when needed.
  */
 function fcToPointFC(fc, maxPoints = 5000) {
-  const coords = []
+    const coords = []
 
-  for (const feat of fc.features || []) {
-    const g = feat.geometry
-    if (!g) continue
-    if (g.type === "Point") {
-      coords.push(g.coordinates)
-    } else if (g.type === "MultiPoint") {
-      for (const c of g.coordinates || []) coords.push(c)
-    } else if (g.type === "LineString") {
-      for (const c of g.coordinates || []) coords.push(c)
-    } else if (g.type === "MultiLineString") {
-      for (const part of g.coordinates || []) for (const c of part || []) coords.push(c)
-    } else if (g.type === "Polygon") {
-      for (const ring of g.coordinates || []) for (const c of ring || []) coords.push(c)
-    } else if (g.type === "MultiPolygon") {
-      for (const poly of g.coordinates || [])
-        for (const ring of poly || [])
-          for (const c of ring || []) coords.push(c)
+    for (const feat of fc.features || []) {
+        const g = feat.geometry
+        if (!g) continue
+        if (g.type === "Point") {
+            coords.push(g.coordinates)
+        } else if (g.type === "MultiPoint") {
+            for (const c of g.coordinates || []) coords.push(c)
+        } else if (g.type === "LineString") {
+            for (const c of g.coordinates || []) coords.push(c)
+        } else if (g.type === "MultiLineString") {
+            for (const part of g.coordinates || []) for (const c of part || []) coords.push(c)
+        } else if (g.type === "Polygon") {
+            for (const ring of g.coordinates || []) for (const c of ring || []) coords.push(c)
+        } else if (g.type === "MultiPolygon") {
+            for (const poly of g.coordinates || [])
+            for (const ring of poly || [])
+            for (const c of ring || []) coords.push(c)
+        }
     }
-  }
 
-  if (coords.length === 0) return { type: "FeatureCollection", features: [] }
+    if (coords.length === 0) return { type: "FeatureCollection", features: [] }
 
-  const stride = Math.max(1, Math.ceil(coords.length / maxPoints))
-  const features = coords
-    .filter((_, i) => i % stride === 0)
-    .map((c, i) => ({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: c },
-      properties: { vertexIndex: i, stride },
-    }))
+    const stride = Math.max(1, Math.ceil(coords.length / maxPoints))
+    const features = coords
+        .filter((_, i) => i % stride === 0)
+        .map((c, i) => ({
+            type: "Feature",
+            geometry: { type: "Point", coordinates: c },
+            properties: { vertexIndex: i, stride },
+        }))
 
-  return { type: "FeatureCollection", features }
+    return { type: "FeatureCollection", features }
 }
 
 
@@ -190,7 +304,6 @@ export default function RouteLayer({
     opacity = 1.0,
     onData,
     fitOnLoad = false,
-    showVertices = false,  
     routeImportance = "medium",
     showSmoothed = false,
 }) {
@@ -198,6 +311,8 @@ export default function RouteLayer({
     // React state holding the loaded route GeoJSON (Feature/FeatureCollection).
     // const [geojson, setGeojson] = useState(null)
     const lastSentRef = useRef(null)
+    const featureLayerIdsRef = useRef([]);
+
     const { data: smoothed, original: original} = useSmoothRoute({
         url,
         options: {
@@ -205,12 +320,13 @@ export default function RouteLayer({
             deflectionThresholdDeg: 20, // what counts as “sharp”
             filletFraction: .4, // how rounded the corner feels (0.15–0.3 feels natural)
             densifySegments: 0,
-            spline: true,
+            spline: false,
             resampleSpacingMeters: 9 // spacing of points in final output
         },
     })
 
-    // // // Load routes json from URL input
+
+    // Load routes json from URL input
     // useEffect(() => {
     //     let cancelled = false
     //     if (!url) return
@@ -233,120 +349,182 @@ export default function RouteLayer({
 
     const fc = showSmoothed ? smoothedFC : originalFC
 
-    /* From the current FeatureCollection fc, it calculates once (per fc change) 
-    all the constants the layers need, then caches them: */
-    const derived = useMemo(() => {
+    // 0) Get lines decorated with t1,t2,t3 stops for gradient rendering
+    // Build a cloned FC that carries per-feature stops
+    const fcIndexed = useMemo(() => {
         if (!fc) return null;
-        const startTailT = gradientStartT(fc, 500);
-        const { origin, endpoints } = endpointsFromFC(fc);
-
-        // gradient stops in line-progress space
-        const t0 = Math.max(0, startTailT - 0.001);
-        const t1 = startTailT + (1 - startTailT) * 0.33;
-        const t2 = startTailT + (1 - startTailT) * 0.66;
-        const t3 = 1.0;
-
-        return { startTailT, t0, t1, t2, t3, origin, endpoints };
+        return {
+            type: "FeatureCollection",
+            features: (fc.features || []).map((feat, i) => ({
+            ...feat,
+            id: i, // give it a real Feature.id
+            properties: { ...(feat.properties || {}), __idx: i },
+            })),
+        };
     }, [fc]);
 
+    const { origin, endpoints } = useMemo(() => {
+        if (!fcIndexed) return { origin: null, endpoints: [] };
+        let originPt = null;
+        const ends = [];
+
+        for (const feat of fcIndexed.features || []) {
+            const g = feat.geometry;
+            if (!g) continue;
+            const start = coordAtT(g, 0); // uses your helper
+            const end   = coordAtT(g, 1);
+
+            if (!originPt && start) originPt = start;
+            if (end) ends.push(end);
+        }
+        return { origin: originPt, endpoints: ends };
+    }, [fcIndexed]);
+    
+    
     // 1) Source (route geojson)
     useEffect(() => {
-        if (!map || !fc) return;
-        upsertGeoJSONSource(map, sourceId, fc, true); // lineMetrics for gradient
-    }, [map, fc, sourceId]);
-
+        if (!map || !fcIndexed) return;
+        upsertGeoJSONSource(map, sourceId, fcIndexed, true); // lineMetrics for gradient
+    }, [map, fcIndexed, sourceId]);
 
     
     // 2) Line layers (main + outline)
     useEffect(() => {
-        if (!map || !fc || !derived) return;
+        if (!map || !fcIndexed) return;
 
-        const { t0, t1, t2, t3, startTailT } = derived;
-        const START_COLOR = SDIC_BLUE;
-        const MID_COLOR_1 = "#253BE2";
-        const MID_COLOR_2 = "#187775";
-        const END_COLOR   = "#24DE8C";
+        // Clean up any previously created per-feature layers
+        // clear previously created layers
+        featureLayerIdsRef.current.forEach(id => map.getLayer(id) && map.removeLayer(id));
+        featureLayerIdsRef.current = [];
 
-        const getLineStyle = (importance) => ({ width: CRAYON_WIDTH, opacity: CRAYON_OPACITY });
-        const lineStyle = getLineStyle(routeImportance);
+        (fcIndexed.features || []).forEach((feat, i) => {
+            // Compute per-feature stops
+            const { t1, t2, t3, t4, t5 } = computeStopsForGeometry(feat.geometry, {
+                headMeters: head_t,
+                tailMeters: tail_t,
+                innerHeadMeters: inner_head_t,
+                innerTailMeters: inner_tail_t,
+                minGapT: 1e-3,
+            });
 
-        // main gradient line
-        ensureLineLayer(map, layerId, sourceId, {
-            "line-color": START_COLOR,
-            "line-gradient": [
+            const id = `${layerId}-${i}`;
+
+            // Build a gradient that uses only LITERAL stop positions
+            const lineGradient = [
                 "interpolate", ["linear"], ["line-progress"],
-                0.0, "#24DE8C",
-                0.05, "#187775",
-                0.55, "#253BE2",
-                0.8,  "#ffffff",
-                startTailT, "#ffffff",
-                t1, "#253BE2",
-                t2, "#187775",
-                1.0, "#24DE8C",
-            ],
-            "line-width": lineStyle.width / 2,
-            "line-opacity": lineStyle.opacity * opacity,
-            "line-blur": 0.55,
+                0.0,   START_COLOR,
+                t1,  START_COLOR,
+                t2,  MID_COLOR,
+                t3,  MID_COLOR,
+                t4,  MID_COLOR,
+                t5,  END_COLOR,
+                1,   END_COLOR,
+            ] ;
+
+            // Add the layer, filtered to just this feature.id
+            map.addLayer({
+                id,
+                type: "line",
+                source: sourceId,
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                    "line-gradient": lineGradient,
+                    "line-width": CRAYON_WIDTH / 2,
+                    "line-opacity": CRAYON_OPACITY ,
+                    "line-blur": 0.5,
+                },
+                // draw only the parts that belong to this original feature (route)
+                filter: ["==", ["id"], i],
+            });
+
+            featureLayerIdsRef.current.push(id);           
         });
 
-        // outline glow
-        const outlineId = `${layerId}-outline`;
-        ensureLineLayer(map, outlineId, sourceId, {
-            "line-color": START_COLOR,
-            "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, START_COLOR, t0, START_COLOR, t1, MID_COLOR_1, t2, MID_COLOR_2, t3, END_COLOR],
-            "line-width": CRAYON_WIDTH + 1.0,
-            "line-opacity": (CRAYON_OPACITY * opacity) * 0.55,
-            "line-blur": 0.8,
-        }, layerId);
 
         // cleanup for these two layers on id changes/unmount
         return () => {
-            [outlineId, layerId].forEach(id => { if (map.getLayer(id)) map.removeLayer(id) });
+            featureLayerIdsRef.current.forEach(id => map.getLayer(id) && map.removeLayer(id));
+            featureLayerIdsRef.current = [];
         };
-    }, [map, fc, derived, sourceId, layerId, opacity, routeImportance]);
+    }, [map, fc, fcIndexed, sourceId, layerId, opacity, routeImportance]);
 
 
     // 3a) Origin & endpoint points
     useEffect(() => {
-        if (!map || !derived) return;
-        const { origin, endpoints } = derived;
+        if (!map || !fcIndexed) return;
 
         const pointSrc = `${sourceId}-origin-point`;
         const endSrc   = `${sourceId}-endpoint-point`;
 
         if (origin) {
-            const pointFC = { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: origin }, properties: {} }] };
+            const pointFC = {
+                type: "FeatureCollection",
+                features: [{ type: "Feature", geometry: { type: "Point", coordinates: origin }, properties: {} }],
+            };
             upsertGeoJSONSource(map, pointSrc, pointFC);
-            ensurePointLayer(map, `${layerId}-origin-glow-outer`,  pointSrc, { "circle-color": LIGHT_BLUE, "circle-radius": 10, "circle-opacity": 0.15 });
-            ensurePointLayer(map, `${layerId}-origin-glow-middle`, pointSrc, { "circle-color": LIGHT_BLUE, "circle-radius": 8,  "circle-opacity": 0.3  });
-            ensurePointLayer(map, `${layerId}-origin-dot`,         pointSrc, { "circle-color": LIGHT_BLUE, "circle-radius": 4,  "circle-opacity": 0.9  });
+            const baseZoomRadius = (k) => [
+                "interpolate", ["linear"], ["zoom"],
+                8,  20 * k,
+                12, 65 * k,
+                16, 65 * k
+            ];
+            const ks = [1.0, .6, , .3, .2, .1];
+            ks.forEach((k, i) => {
+                ensurePointLayer(map, `${layerId}-origin-glow${i+1}`, pointSrc, {
+                    "circle-color": START_COLOR,
+                    "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
+                    "circle-opacity": i === 0 ? 0.1 : 0.15,
+                    "circle-blur": i === 0 ? 0.5 : 0.25,
+                });
+            });
         }
 
-        if (endpoints?.length) {
-            const endpointFC = { type: "FeatureCollection", features: endpoints.map((c, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: { endpointIndex: i } })) };
+        if (endpoints.length) {
+            const endpointFC = {
+                type: "FeatureCollection",
+                features: endpoints.map((c, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: { endpointIndex: i } })),
+            };
             upsertGeoJSONSource(map, endSrc, endpointFC);
-            ensurePointLayer(map, `${layerId}-endpoint-glow-outer`,  endSrc, { "circle-color": SDIC_BLUE,  "circle-radius": ["interpolate", ["linear"], ["zoom"], 8,1, 10,2, 12,6, 16,8],  "circle-opacity": 0.25 });
-            ensurePointLayer(map, `${layerId}-endpoint-glow-middle`, endSrc, { "circle-color": ACCENT_BLUE,"circle-radius": ["interpolate", ["linear"], ["zoom"], 8,0.8,10,1.5,12,4,16,8], "circle-opacity": 0.3  });
-            ensurePointLayer(map, `${layerId}-endpoint-dot`,         endSrc, { "circle-color": SDIC_BLUE,  "circle-radius": ["interpolate", ["linear"], ["zoom"], 8,0.5,10,1,12,2.5,16,5],  "circle-opacity": 0.9  });
+            const baseZoomRadius = (k) => [
+                "interpolate", ["linear"], ["zoom"],
+                10,  15 * k,
+                12, 20 * k,
+                16, 65 * k
+            ];
+            const ks = [1.0, .3, .2, .1];
+            ks.forEach((k, i) => {
+                ensurePointLayer(map, `${layerId}-endpoint-glow${i+1}`, endSrc, {
+                    "circle-color": END_COLOR,
+                    "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
+                    "circle-opacity": i === 0 ? 0.1 : 0.2,
+                    "circle-blur": i === 0 ? 0.5 : 0.25,
+                });
+            });
         }
 
         return () => {
             const ids = [
-                `${layerId}-endpoint-dot`,
-                `${layerId}-endpoint-glow-middle`,
-                `${layerId}-endpoint-glow-outer`,
-                `${layerId}-origin-dot`,
-                `${layerId}-origin-glow-middle`,
-                `${layerId}-origin-glow-outer`,
+                `${layerId}-origin-glow1`,
+                `${layerId}-origin-glow2`,
+                `${layerId}-origin-glow3`,
+                `${layerId}-origin-glow4`,
+                `${layerId}-origin-glow5`,
+                `${layerId}-origin-glow6`,
+                `${layerId}-endpoint-glow1`,
+                `${layerId}-endpoint-glow2`,
+                `${layerId}-endpoint-glow3`,
+                `${layerId}-endpoint-glow4`,
+                `${layerId}-endpoint-glow5`,
+                `${layerId}-endpoint-glow6`,
             ];
             ids.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) });
             if (map.getSource(pointSrc)) map.removeSource(pointSrc);
             if (map.getSource(endSrc))   map.removeSource(endSrc);
         };
-    }, [map, derived, sourceId, layerId]);
+    }, [map, fcIndexed, origin, endpoints, sourceId, layerId]);
 
 
-    // 3b) All vertices as points (FOR DEBUGGING)
+    // 3b) Show vertices as points (FOR DEBUGGING)
     useEffect(() => {
         if (!map || !fc || !showVertices) return
 
@@ -373,6 +551,92 @@ export default function RouteLayer({
     }, [map, fc, sourceId, layerId, showVertices])
 
 
+    // 3c) Visualizing points where gradient changes (for debugging only)
+    useEffect(() => {
+        if (!map || !fcIndexed || !showGradientVertices) return;
+
+        const stopSrcId   = `${sourceId}-stops`;
+        const stopCoreId  = `${layerId}-stops-core`;
+        const stopLabelId = `${layerId}-stops-labels`;
+
+        // Build points: t1,t2,t3 for each feature using your existing computeStopsForGeometry
+        const features = [];
+        (fcIndexed.features || []).forEach((feat, i) => {
+            const { t0, t1, t2, t3, t4, t5, t6 } = computeStopsForGeometry(feat.geometry, {
+                headMeters: head_t,
+                tailMeters: tail_t,
+                innerHeadMeters: inner_head_t,
+                innerTailMeters: inner_tail_t,
+                minGapT: 1e-3,
+            });
+
+            const addStop = (label, t) => {
+                const coord = coordAtT(feat.geometry, t);
+                if (!coord) return;
+                features.push({
+                    type: "Feature",
+                    geometry: { type: "Point", coordinates: coord },
+                    properties: { label, t, routeIndex: i },
+                });
+            };
+            addStop("t0", t0);
+            addStop("t1", t1);
+            addStop("t2", t2);
+            addStop("t3", t3);
+            addStop("t4", t4);
+            addStop("t5", t5);
+            addStop("t6", t6);
+        });
+
+        const stopsFC = { type: "FeatureCollection", features };
+        upsertGeoJSONSource(map, stopSrcId, stopsFC);
+
+        // Nice, crisp points
+        ensurePointLayer(map, stopCoreId, stopSrcId, {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 2, 14, 3, 20, 7],
+            "circle-color": [
+            "match", ["get", "label"],
+            "t0", START_COLOR,
+            "t1", START_COLOR,
+            "t2", MID_COLOR,
+            "t3", MID_COLOR,
+            "t4", MID_COLOR,
+            "t5", END_COLOR,
+            "t6", END_COLOR,
+
+            /* default */ "#000000"
+            ],
+            "circle-stroke-color": "#000000",
+            "circle-stroke-width": 0.75,
+            "circle-opacity": 0.95,
+        });
+
+        // Optional: labels right next to the dots
+        if (!map.getLayer(stopLabelId)) {
+            map.addLayer({
+            id: stopLabelId,
+            type: "symbol",
+            source: stopSrcId,
+            layout: {
+                "text-field": ["get", "label"],
+                "text-size": ["interpolate", ["linear"], ["zoom"], 8, 8, 16, 12],
+                "text-offset": [0.3, .3],
+                "text-anchor": "top",
+            },
+            paint: {
+                "text-color": "#ffffff",
+                "text-halo-color": "#000000",
+                "text-halo-width": 0.8,
+                "text-opacity": 0.9,
+            },
+            });
+        }
+
+        return () => {
+            [stopLabelId, stopCoreId].forEach(id => map.getLayer(id) && map.removeLayer(id));
+            map.getSource(stopSrcId) && map.removeSource(stopSrcId);
+        };
+    }, [map, fcIndexed, sourceId, layerId]);
     
     // 4) One-time fit-to-bounds
     const didFitRef = useRef(false);
@@ -392,7 +656,6 @@ export default function RouteLayer({
             }
         } catch {}
     }, [map, fc, fitOnLoad]);
-
 
     
     // Local file loader

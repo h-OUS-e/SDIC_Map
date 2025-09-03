@@ -25,11 +25,11 @@ const MID_COLOR = "#235382";
 const END_COLOR = NEON_BLUE;
 const head_t = 10;
 const tail_t = 10;
-const inner_head_t = 1000;
-const inner_tail_t = 1000;
+const inner_head_t = 10;
+const inner_tail_t = 100;
 
 const showVertices = false;
-const showGradientVertices = false;
+const showGradientVertices = true;
 
 // Distance helpers
 

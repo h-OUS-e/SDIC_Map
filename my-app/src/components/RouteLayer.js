@@ -20,9 +20,9 @@ const DARK_GREEN = "#138B4F"
 // Parameters
 const CRAYON_WIDTH = 8
 const CRAYON_OPACITY = .2
-const START_COLOR = "#1d8f81";
+const START_COLOR = NEON_GREEN;
 const MID_COLOR = "#1d8f81";
-const END_COLOR = "#1d8f81";
+const END_COLOR = SDIC_BLUE;
 const head_t = 100;
 const tail_t = 100;
 const inner_head_t = 1000;

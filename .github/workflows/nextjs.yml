@@ -29,7 +29,7 @@ jobs:
   build:
     defaults:
         run:
-          working-directory: my-app
+          working-directory: ./my-app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,7 +53,6 @@ jobs:
           fi
       - name: Setup Node
         uses: actions/setup-node@v4
-        working-directory: "${{ github.workspace }}/my-app
         with:
           node-version: "20"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
@@ -82,7 +81,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ github.workspace }}//my-app/out
+          path: ${{ github.workspace }}/my-app/out
 
   # Deployment job
   deploy:

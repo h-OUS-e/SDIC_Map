@@ -27,7 +27,11 @@ concurrency:
 jobs:
   # Build job
   build:
+    defaults:
+        run:
+          working-directory: ./my-app
     runs-on: ubuntu-latest
+    working-directory: ./my-app
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -78,7 +82,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./out
+          path: ./my-app/out
 
   # Deployment job
   deploy:

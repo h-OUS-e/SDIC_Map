@@ -224,8 +224,8 @@ export default function Map() {
                         <TripsOverlay
                             map={map.current}
                             data={trips}
-                            speed={5}    // tweak freely
-                            trail={90}
+                            speed={25}    // tweak freely
+                            trail={900}
                             opacity={.2}
                             lineWidth={3}
                             metersPerSecond={45}  // ~18 km/h cycling pace

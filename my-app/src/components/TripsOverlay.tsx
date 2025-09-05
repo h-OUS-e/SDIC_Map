@@ -55,6 +55,18 @@ function retimeConstantSpeed(d: TripDatum, mps: number): TripDatum {
   return { ...d, timestamps: ts };
 }
 
+function getMaxTimestamp(arr: TripDatum[]): number {
+  let maxT = 0;
+  for (const d of arr) {
+    const ts = d?.timestamps;
+    if (Array.isArray(ts) && ts.length) {
+      const t = ts[ts.length - 1];
+      if (Number.isFinite(t) && t > maxT) maxT = t;
+    }
+  }
+  return maxT;
+}
+
 
 
 /**
@@ -79,8 +91,6 @@ export default function TripsOverlay({
   const lastTickMsRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
 
-  // Compute global max timestamp for looping and bounds
-  const maxTs = useMemo(() => getMaxTimestamp(data), [data]);
 
     // --- create the data you actually feed to TripsLayer ---
     const layerData = useMemo(() => {
@@ -88,6 +98,8 @@ export default function TripsOverlay({
         return data.map(d => retimeConstantSpeed(d, metersPerSecond));
     }, [data, metersPerSecond]);
 
+    // Compute global max timestamp for looping and bounds
+    const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);
     
 
   // Create / attach overlay
@@ -189,13 +201,3 @@ export default function TripsOverlay({
   return null;
 }
 
-function getMaxTimestamp(data: TripDatum[]): number {
-  let maxT = 0;
-  for (const d of data) {
-    if (Array.isArray(d?.timestamps) && d.timestamps.length) {
-      const t = d.timestamps[d.timestamps.length - 1];
-      if (Number.isFinite(t) && t > maxT) maxT = t;
-    }
-  }
-  return maxT;
-}

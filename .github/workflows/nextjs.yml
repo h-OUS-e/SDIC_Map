@@ -29,7 +29,7 @@ jobs:
   build:
     defaults:
         run:
-          working-directory: ./my-app
+          working-directory: /my-app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +52,6 @@ jobs:
             exit 1
           fi
       - name: Setup Node
-        working-directory: ./my-app
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -66,7 +65,6 @@ jobs:
           # You may remove this line if you want to manage the configuration yourself.
           static_site_generator: next
       - name: Restore cache
-        working-directory: ./my-app
         uses: actions/cache@v4
         with:
           path: |
@@ -77,14 +75,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-
       - name: Install dependencies
-        working-directory: ./my-app
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
       - name: Build with Next.js
         run: ${{ steps.detect-package-manager.outputs.runner }} next build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./my-app/out
+          path: ${{ github.workspace }}//my-app/out
 
   # Deployment job
   deploy:

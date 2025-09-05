@@ -508,13 +508,13 @@ export default function RouteLayer({
                 12, 50 * k,
                 16, 65 * k
             ];
-            const ks = [1.0, .5, , .2, .1, .05];
+            const ks = [1.0, .5, .4 , .3, .2, .15];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-origin-glow${i+1}`, pointSrc, {
                     "circle-color": START_COLOR,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
-                    "circle-opacity": i === 0 ? 0.1 : 0.4,
-                    "circle-blur": i === 0 ? 0.5 : 0.25,
+                    "circle-opacity": i === ks.length -1 ? 0.6 : 0.2,
+                    "circle-blur": i === ks.length -1 ? 0.1 : 0.3,
                 });
             });
         }
@@ -570,13 +570,13 @@ export default function RouteLayer({
                 12, 20 * k,
                 16, 40 * k
             ];
-            const ks = [1.0, .6, .3, .2];
+            const ks = [1.3, .3, .2, .14];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-endpoint-glow${i+1}`, endSrc, {
                     "circle-color": END_COLOR,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
-                    "circle-opacity": i === ks.length ? 0.5 : 0.1,
-                    "circle-blur": i === 0 ? 0.4 : 0.25,
+                    "circle-opacity": i === ks.length - 1 ? 0.5 : 0.1,
+                    "circle-blur": i === ks.length - 1 ? 0.5 : 0.3,
                 });
             });
 

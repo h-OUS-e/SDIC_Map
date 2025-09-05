@@ -31,6 +31,23 @@ const inner_tail_t = 1000;
 const showVertices = false;
 const showGradientVertices = false;
 
+
+
+// --- CSV helpers ---
+const normalize = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+function parseSemicolonCSV(text) {
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return [];
+    const headers = lines.shift().split(";").map((h) => h.trim());
+    return lines.map((line) => {
+        const cols = line.split(";").map((c) => c.trim());
+        const row = {};
+        headers.forEach((h, i) => (row[h] = cols[i] ?? ""));
+        return row;
+    });
+}
+
 // Distance helpers
 
 /** Haversine: distance in meters between two [lon, lat] points on Earth using Haversine formula. */
@@ -45,7 +62,6 @@ function haversineMeters(a, b) {
     return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-
 /** Cumulative distances (m) along a polyline; i = meters from start to coords[i] ([lon, lat]). */
 function cumulativeMeters(coords) {
     const cum = [0]
@@ -54,7 +70,6 @@ function cumulativeMeters(coords) {
     }
     return cum
 }
-
 
 /** Total length (m) of a GeoJSON LineString or MultiLineString. */
 function totalLengthMeters(geom) {
@@ -69,7 +84,6 @@ function totalLengthMeters(geom) {
     }
     return total
 }
-
 
 // Geojson Helpers
 const asFC = (g) =>
@@ -312,6 +326,32 @@ export default function RouteLayer({
     // const [geojson, setGeojson] = useState(null)
     const lastSentRef = useRef(null)
     const featureLayerIdsRef = useRef([]);
+    const popupRef = useRef(null);
+
+    // CSV State
+    const [csvRows, setCsvRows] = useState([]);
+    const csvIndex = useMemo(() => {
+        // index by both `to` and `location_name` for flexible matching
+        const byTo = new Map();
+        const byLoc = new Map();
+        for (const r of csvRows) {
+            if (r.to) byTo.set(normalize(r.to), r);
+            if (r.location_name) byLoc.set(normalize(r.location_name), r);
+        }
+        return { byTo, byLoc };
+    }, [csvRows]);
+
+    const onCsvFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            setCsvRows(parseSemicolonCSV(text));
+        } catch (err) {
+            console.error("Invalid CSV file", err);
+            alert("Invalid CSV file");
+        }
+    };
 
     const { data: smoothed, original: original} = useSmoothRoute({
         url,
@@ -482,7 +522,46 @@ export default function RouteLayer({
         if (endpoints.length) {
             const endpointFC = {
                 type: "FeatureCollection",
-                features: endpoints.map((c, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: { endpointIndex: i } })),
+                features: endpoints.map((coord, i) => {
+                    // try to get props from whichever FC has metadata;
+                    // prefer ORIGINAL feature props because smoothed often loses them
+                    const origProps = originalFC?.features?.[i]?.properties || {};
+                    const featProps = fcIndexed?.features?.[i]?.properties || {};
+                    const srcProps  = Object.keys(origProps).length ? origProps : featProps;
+
+                    // text fields we might match CSV with
+                    const toStr  = srcProps.to || srcProps.to_address || srcProps.destination || "";
+                    const locStr = srcProps.location_name || srcProps.location || "";
+
+                    // CSV row by index (strongest signal if your CSV rows line up with endpoints)
+                    const rowByIdx =
+                    Array.isArray(csvRows) && csvRows[i] ? csvRows[i] : null;
+
+                    // CSV row by value (fallback)
+                    const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+                    const rowByTo  = csvRows?.find?.((r) => norm(r.to) === norm(toStr));
+                    const rowByLoc = csvRows?.find?.((r) => norm(r.location_name) === norm(locStr));
+
+                    const row = rowByIdx || rowByTo || rowByLoc || null;
+
+                    const props = {
+                    endpointIndex: i,
+                    // prefer CSV, then original src props, then empty string
+                    month:        row?.month        ?? srcProps.month        ?? "",
+                    team:         row?.team         ?? srcProps.team         ?? "",
+                    class:        row?.class        ?? srcProps.class        ?? "",   // keep empty if none
+                    location_name:row?.location_name?? srcProps.location_name?? "",
+                    address:      row?.to           ?? toStr,                // "address" = CSV `to` or original `to`
+                    activity:     row?.activity     ?? srcProps.activity     ?? "",
+                    profile:      row?.profile      ?? srcProps.profile      ?? "",
+                    };
+
+                    return {
+                    type: "Feature",
+                    geometry: { type: "Point", coordinates: coord },
+                    properties: props,
+                    };
+                }),
             };
             upsertGeoJSONSource(map, endSrc, endpointFC);
             const baseZoomRadius = (k) => [
@@ -500,6 +579,22 @@ export default function RouteLayer({
                     "circle-blur": i === 0 ? 0.5 : 0.25,
                 });
             });
+
+            // Invisible hit points to hover over for popups
+            const endHitId = `${layerId}-endpoint-hit`;
+            if (!map.getLayer(endHitId)) {
+                map.addLayer({
+                    id: endHitId,
+                    type: "circle",
+                    source: endSrc,
+                    paint: {
+                        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 18, 16, 28],
+                        "circle-color": "#000000",
+                        "circle-opacity": 0, // invisible but still hit-testable
+                    }
+                });
+            }
+
         }
 
         return () => {
@@ -516,12 +611,13 @@ export default function RouteLayer({
                 `${layerId}-endpoint-glow4`,
                 `${layerId}-endpoint-glow5`,
                 `${layerId}-endpoint-glow6`,
+                `${layerId}-endpoint-hit`,
             ];
             ids.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) });
             if (map.getSource(pointSrc)) map.removeSource(pointSrc);
             if (map.getSource(endSrc))   map.removeSource(endSrc);
         };
-    }, [map, fcIndexed, origin, endpoints, sourceId, layerId]);
+    }, [map, fcIndexed, origin, endpoints, sourceId, layerId, csvIndex]);
 
 
     // 3b) Show vertices as points (FOR DEBUGGING)
@@ -657,6 +753,7 @@ export default function RouteLayer({
         } catch {}
     }, [map, fc, fitOnLoad]);
 
+
     
     // Local file loader
     const onFile = async (e) => {
@@ -689,8 +786,12 @@ export default function RouteLayer({
             borderRadius: 8,
         }}
         >
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route</div>
+
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route and load address list.</div>
         <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
+        <div style={{ height: 8 }} />
+        <input type="file" accept=".csv,text/csv" onChange={onCsvFile} />
         </div>
+        
     )
 }

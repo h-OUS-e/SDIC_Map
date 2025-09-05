@@ -29,7 +29,7 @@ jobs:
   build:
     defaults:
         run:
-          working-directory: /my-app
+          working-directory: my-app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

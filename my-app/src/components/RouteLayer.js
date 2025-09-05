@@ -20,7 +20,7 @@ const DARK_GREEN = "#138B4F"
 // Parameters
 const CRAYON_WIDTH = 8
 const CRAYON_OPACITY = .3
-const START_COLOR = "#72c5fc";
+const START_COLOR = "#ffffff";
 const MID_COLOR = SDIC_BLUE;
 const END_COLOR = "#8b60f7";
 const head_t = 100;
@@ -326,7 +326,6 @@ export default function RouteLayer({
     // const [geojson, setGeojson] = useState(null)
     const lastSentRef = useRef(null)
     const featureLayerIdsRef = useRef([]);
-    const popupRef = useRef(null);
 
     // CSV State
     const [csvRows, setCsvRows] = useState([]);
@@ -402,6 +401,27 @@ export default function RouteLayer({
             })),
         };
     }, [fc]);
+
+    useEffect(() => {
+        if (!smoothedFC || !onData) return;
+
+        // Optional: ensure there’s at least one feature before sending
+        const hasFeatures =
+            Array.isArray(smoothedFC.features) && smoothedFC.features.length > 0;
+
+        if (!hasFeatures) return;
+
+        // Avoid duplicate sends for the same object reference
+        if (lastSentRef.current !== smoothedFC) {
+            lastSentRef.current = smoothedFC;
+            try {
+                onData(smoothedFC); // <- sends the displayed collection (smoothed or original) to the parent
+                // console.debug("[RouteLayer] onData sent FC with", fc.features.length, "features");
+            } catch (err) {
+                console.error("[RouteLayer] onData failed:", err);
+            }
+        }
+    }, [smoothedFC, onData]);
 
     const { origin, endpoints } = useMemo(() => {
         if (!fcIndexed) return { origin: null, endpoints: [] };

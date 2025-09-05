@@ -220,16 +220,17 @@ export default function Map() {
                     {/* camera stable by disabling fit; expose data upward */}
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
-                    {/* {map.current && trips.length > 0 && (
+                    {map.current && trips.length > 0 && (
                         <TripsOverlay
                             map={map.current}
                             data={trips}
-                            speed={10.8}    // tweak freely
-                            trail={900}
-                            opacity={0.5}
-                            lineWidth={3.1}
+                            speed={5}    // tweak freely
+                            trail={90}
+                            opacity={.2}
+                            lineWidth={3}
+                            metersPerSecond={45}  // ~18 km/h cycling pace
                         />
-                    )} */}
+                    )}
 
                     {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
 

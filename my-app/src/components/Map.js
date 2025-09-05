@@ -1,7 +1,6 @@
 'use client';
 
 import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
 import RouteLayer from './RouteLayer';
@@ -13,6 +12,15 @@ import TripsOverlay from './TripsOverlay';
 
 const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 
+
+function getBasePath() {
+  if (typeof window === 'undefined') return '';
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  // On GH Pages: /<repo>/...  -> use the first segment
+  return parts.length ? `/${parts[0]}` : '';
+}
+
+
 export default function Map() {
     const mapContainer = useRef(null);
     const map = useRef(null);
@@ -20,6 +28,8 @@ export default function Map() {
     const [visualizationMode, setVisualizationMode] = useState("offset"); 
     const layerId = "saved-route-line";
 
+    const basePath = getBasePath();
+    const routesUrl = `${basePath}/assets/routes/routes.geojson`;
     const [showSmoothed, setShowSmoothed] = useState(true);
     const toggleSmoothed = () => setShowSmoothed(s => !s);
     
@@ -140,7 +150,7 @@ export default function Map() {
     };
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
             {/* A Switch button to toggle between SF zoom in and out.*/}
             <button
                 onClick={toggleView}
@@ -204,15 +214,11 @@ export default function Map() {
                 {viewInfo.zoom.toFixed(2)}
             </div>
 
-            <div 
-                ref={mapContainer} 
-                className="map"
-                style={{ width: '100%', height: '100%' }}
-            />
+            <div ref={mapContainer} className="map" style={{ width: '100%', height: '100%' }} />
             {isMapLoaded && (
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} url="./assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
+                    <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
                     {map.current && trips.length > 0 && (
                         <TripsOverlay

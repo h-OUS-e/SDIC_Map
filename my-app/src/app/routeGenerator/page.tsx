@@ -29,24 +29,20 @@ interface RouteFeature extends GeoJSON.Feature<GeoJSON.LineString> {
   };
 }
 
+type Profile = "driving" | "cycling" | "walking";
 // type Pair = { from: string; to: string };
 type Pair = {
   from: string;
   to: string;
-  profile: "driving" | "cycling" | "walking";
-
-  // metadata fields (all optional; filled if present in CSV)
+  original_from: string;
+  original_to: string;
+  profile?: Profile;
   month?: string;
-  class?: string;
   team?: string;
+  class?: string;
   location_name?: string;
   activity?: string;
-
-  // Always keep the original raw strings
-  original_from?: string;
-  original_to?: string;
 };
-
 
 
 function toGTravelMode(p: "driving"|"cycling"|"walking") {
@@ -165,57 +161,76 @@ function sleep(ms: number) {
 
 
 
-function toPairsFromCSV(parsed: Papa.ParseResult<any>): Pair[] {
-  const rows: any[] = parsed.data?.filter(Boolean) || [];
+function toPairsFromCSV(parsed: Papa.ParseResult<unknown>): Pair[] {
+  const data = parsed.data ?? [];
+  const rows = data.filter((r): r is Record<string, unknown> | unknown[] => r != null);
+
   if (rows.length === 0) return [];
 
   const first = rows[0];
-  const hasHeaderObjects = typeof first === "object" && !Array.isArray(first);
+
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+
 
   // helpers
-  const normKeys = (obj: Record<string, any>) => {
-    const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(obj)) out[String(k).trim().toLowerCase()] = v;
+  const normKeys = (obj: Record<string, unknown>) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[String(k).trim().toLowerCase()] = v;
+    }
     return out;
   };
-  const asString = (v: any) => {
+  
+  const asString = (v: unknown): string | undefined => {
     if (v === null || v === undefined) return undefined;
     const s = String(v).trim();
     return s === "" ? undefined : s;
   };
 
-  if (hasHeaderObjects) {
+  const parseProfile = (v: unknown): Profile | undefined => {
+    const s = asString(v)?.toLowerCase();
+    if (s === "driving" || s === "cycling" || s === "walking") return s;
+    return undefined; // or return "driving" to default
+  };
+
+  if (isPlainObject(first)) {
     // headered CSV
     const headerKeys = Object.keys(first).map((k) => k.trim().toLowerCase());
     const hasFromTo = headerKeys.includes("from") && headerKeys.includes("to");
-    const hasAddress = headerKeys.includes("address") || headerKeys.includes("addresses");
+    // const hasAddress = headerKeys.includes("address") || headerKeys.includes("addresses");
 
     if (hasFromTo) {
-      // Pull through known metadata columns if present
       return rows
-        .map((r) => {
-          const row = normKeys(r);
-          const from = asString(row["from"]);
-          const to = asString(row["to"]);
-          const profile : "driving" | "cycling" | "walking"= row["profile"].trim();
-          if (!from || !to) return null;
-          const pair: Pair = {
-            from,
-            to,
-            profile,
-            original_from: from,
-            original_to: to,
-            month: asString(row["month"]),
-            team: asString(row["team"]),
-            class: asString(row["class"]),
-            location_name: asString(row["location_name"]),
-            activity: asString(row["activity"]),
-          };
-          return pair;
-        })
-        .filter(Boolean) as Pair[];
+      .map((r) => {
+        if (!isPlainObject(r)) return null;
+        const row = normKeys(r);
+        const from = asString(row["from"]);
+        const to = asString(row["to"]);
+        if (!from || !to) return null;
+
+        const profile = parseProfile(row["profile"]);
+
+        const pair: Pair = {
+          from,
+          to,
+          original_from: from,
+          original_to: to,
+          ...(profile ? { profile } : {}),
+          month: asString(row["month"]),
+          team: asString(row["team"]),
+          class: asString(row["class"]),
+          location_name: asString(row["location_name"]),
+          activity: asString(row["activity"]),
+        };
+
+        return pair;
+      })
+      .filter((p): p is Pair => p !== null);
     }
   }
+
+  return [];
 
 }
 
@@ -258,8 +273,10 @@ export default function Page() {
             console.log("pairs", ps);
             if (ps.length === 0) throw new Error("No address pairs found. Provide columns 'from,to' OR a single 'address' column.");
             setPairs(ps);
-          } catch (e: any) {
-            setError(e.message || String(e));
+          } catch (e: unknown) {
+            if (e instanceof Error) {
+              setError(e.message || String(e));
+            }
           } finally {
             setParsing(false);
             resolve();
@@ -297,7 +314,7 @@ export default function Page() {
           cache.get(from) || geocodeGoogle(from, GOOGLE_MAPS_KEY).then((c) => (cache.set(from, c), c)),
           cache.get(to) || geocodeGoogle(to, GOOGLE_MAPS_KEY).then((c) => (cache.set(to, c), c)),
         ]);
-        const feat = await routeGoogle(a, b, profile);
+        const feat = await routeGoogle(a, b, profile ?? DEFAULT_PROFILE);
         
 
         // add metadata to properties
@@ -317,7 +334,7 @@ export default function Page() {
 
         feats.push(enriched);
 
-      } catch (e: any) {
+      } catch (e: Error | unknown) {
         console.warn("Skipping pair due to error:", from, to, e);
       }
       setProgress({ done: i + 1, total: pairs.length });

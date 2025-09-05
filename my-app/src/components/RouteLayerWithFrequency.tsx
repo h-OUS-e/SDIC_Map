@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import maplibregl, { Map as MLMap, LngLatBoundsLike } from "maplibre-gl";
 import type {
   Feature,
   FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
   LineString,
   Position,
-  Geometry,
 } from "geojson";
+import maplibregl, { DataDrivenPropertyValueSpecification, LngLatBoundsLike, Map as MLMap } from "maplibre-gl";
+import React, { useEffect, useRef, useState } from "react";
 
 // ---------- Look & Feel (same palette) ----------
 const LIGHT_BLUE = "#60a5fa";
@@ -28,7 +29,7 @@ type Props = {
   sourceId?: string;
   layerId?: string;
   opacity?: number;
-  onData?: (fc: FeatureCollection<Geometry, any>) => void;
+  onData?: (fc: FeatureCollection<Geometry, unknown>) => void;
   fitOnLoad?: boolean;
   routeImportance?: "low" | "medium" | "high";
   visualizationMode?: "offset" | "stack";
@@ -50,8 +51,8 @@ export default function RouteLayerWithFrequency({
   maxFrequency = 10,
   groupKeyFn,
 }: Props) {
-  const [geojson, setGeojson] = useState<FeatureCollection<Geometry, any> | null>(null);
-  const lastSentRef = useRef<FeatureCollection<Geometry, any> | null>(null);
+  const [geojson, setGeojson] = useState<FeatureCollection<Geometry, unknown> | null>(null);
+  const lastSentRef = useRef<FeatureCollection<Geometry, unknown> | null>(null);
 
   // Load from URL (if provided)
   useEffect(() => {
@@ -61,11 +62,11 @@ export default function RouteLayerWithFrequency({
     (async () => {
       try {
         const res = await fetch(url);
-        const data = (await res.json()) as FeatureCollection<Geometry, any> | Feature<Geometry, any>;
-        const fc: FeatureCollection<Geometry, any> =
+        const data = (await res.json()) as FeatureCollection<Geometry, unknown> | Feature<Geometry, unknown>;
+        const fc: FeatureCollection<Geometry, unknown> =
           data && "type" in data && data.type === "FeatureCollection"
-            ? (data as FeatureCollection<Geometry, any>)
-            : { type: "FeatureCollection", features: [data as Feature<Geometry, any>] };
+            ? (data as FeatureCollection<Geometry, unknown>)
+            : { type: "FeatureCollection", features: [data as Feature<Geometry, unknown>] };
 
         if (!cancelled) {
           setGeojson(fc);
@@ -128,12 +129,12 @@ export default function RouteLayerWithFrequency({
     if (!map || !geojson) return;
 
     // Filter to LineString features only (for grouping)
-    const lineFeatures: Feature<LineString, any>[] = geojson.features
-      .filter((f): f is Feature<LineString, any> => f.geometry?.type === "LineString");
+    const lineFeatures: Feature<LineString, GeoJsonProperties>[] = geojson.features
+      .filter((f): f is Feature<LineString, GeoJsonProperties> => f.geometry?.type === "LineString");
 
     // Group by start/end
     const keyFn = groupKeyFn ?? defaultGroupKey;
-    const groups = new Map<string, Feature<LineString, any>[]>();
+    const groups = new Map<string, Feature<LineString, GeoJsonProperties>[]>();
 
     for (const f of lineFeatures) {
       const coords = f.geometry.coordinates;
@@ -148,7 +149,7 @@ export default function RouteLayerWithFrequency({
 
     // Duplicate features to show frequency: offset or stack
     const GAP_PX = 3.5;
-    const expanded: Feature<LineString, any>[] = [];
+    const expanded: Feature<LineString, unknown>[] = [];
 
     for (const [, arr] of groups) {
       const freq = Math.min(arr.length, Math.max(1, maxFrequency));
@@ -172,7 +173,7 @@ export default function RouteLayerWithFrequency({
       }
     }
 
-    const processedFC: FeatureCollection<LineString, any> = {
+    const processedFC: FeatureCollection<LineString, GeoJsonProperties> = {
       type: "FeatureCollection",
       features: expanded.map((f, idx) => ({
         ...f,
@@ -193,7 +194,7 @@ export default function RouteLayerWithFrequency({
     }
 
     // Frequency-aware width/opacity
-    const widthByFreq: any = [
+    const widthByFreq= [
       "interpolate",
       ["linear"],
       ["min", ["get", "freq"], maxFrequency],
@@ -202,7 +203,7 @@ export default function RouteLayerWithFrequency({
     ];
 
     const baseOpacity = CRAYON_OPACITY * opacity;
-    const opacityByFreq: any = [
+    const opacityByFreq= [
       "interpolate",
       ["linear"],
       ["min", ["get", "freq"], maxFrequency],
@@ -226,8 +227,8 @@ export default function RouteLayerWithFrequency({
             0.5, MEDIUM_BLUE,
             1, ACCENT_BLUE,
           ],
-          "line-width": widthByFreq,
-          "line-opacity": opacityByFreq,
+          "line-width": widthByFreq as DataDrivenPropertyValueSpecification<number> | undefined,
+          "line-opacity": opacityByFreq as DataDrivenPropertyValueSpecification<number> | undefined,
           "line-offset": ["get", "lineOffset"],
         },
       });
@@ -250,8 +251,8 @@ export default function RouteLayerWithFrequency({
               0, MEDIUM_BLUE,
               1, DARK_BLUE,
             ],
-            "line-width": ["+", ["to-number", widthByFreq], 2.5] as any,
-            "line-opacity": ["*", ["to-number", opacityByFreq], 0.4] as any,
+            "line-width": ["+", ["to-number", widthByFreq], 2.5],
+            "line-opacity": ["*", ["to-number", opacityByFreq], 0.4],
             "line-offset": ["get", "lineOffset"],
           },
         },
@@ -415,11 +416,11 @@ export default function RouteLayerWithFrequency({
     if (!file) return;
     try {
       const text = await file.text();
-      const data = JSON.parse(text) as FeatureCollection<Geometry, any> | Feature<Geometry, any>;
-      const fc: FeatureCollection<Geometry, any> =
+      const data = JSON.parse(text) as FeatureCollection<Geometry, unknown> | Feature<Geometry, unknown>;
+      const fc: FeatureCollection<Geometry, unknown> =
         data && "type" in data && data.type === "FeatureCollection"
-          ? (data as FeatureCollection<Geometry, any>)
-          : { type: "FeatureCollection", features: [data as Feature<Geometry, any>] };
+          ? (data as FeatureCollection<Geometry, unknown>)
+          : { type: "FeatureCollection", features: [data as Feature<Geometry, unknown>] };
 
       setGeojson(fc);
       lastSentRef.current = fc;

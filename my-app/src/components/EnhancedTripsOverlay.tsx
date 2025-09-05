@@ -1,17 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import maplibregl from "maplibre-gl" // Regular import, not type import
-import { MapboxOverlay } from "@deck.gl/mapbox"
-import { TripsLayer } from "@deck.gl/geo-layers"
-import { PathLayer, ScatterplotLayer } from "@deck.gl/layers" // Correct import location
-import type { TripDatum } from "../utils/prepareTrips"
-import type { Position, Layer } from "@deck.gl/core"
+import type { Layer, Position } from "@deck.gl/core";
+import { TripsLayer } from "@deck.gl/geo-layers";
+import { PathLayer, ScatterplotLayer } from "@deck.gl/layers"; // Correct import location
+import { MapboxOverlay } from "@deck.gl/mapbox";
+import { GL } from "@luma.gl/constants";
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry, LineString } from "geojson";
+import maplibregl from "maplibre-gl"; // Regular import, not type import
+import { useEffect, useMemo, useRef, useState, } from "react";
+
 
 // Define RGB color as a tuple
-type RGBColor = [number, number, number]
+// type RGBColor = [number, number, number]
 type RGBAColor = [number, number, number, number]
-import { GL } from "@luma.gl/constants"
 
 type Props = {
   map: maplibregl.Map | null
@@ -22,7 +23,7 @@ type Props = {
   fps?: number
   opacity?: number
   showStaticRoutes?: boolean
-  onData?: (data: any) => void
+  onData?: (data: unknown) => void
   fitOnLoad?: boolean
   url?: string
 }
@@ -434,14 +435,40 @@ export default function EnhancedTripsOverlay({
 }
 
 // Helper function to convert GeoJSON to trip data
-function convertGeojsonToTrips(geojson: any): TripDatum[] {
-  const fc = geojson.type === "FeatureCollection" ? geojson : { type: "FeatureCollection", features: [geojson] }
-  
-  return fc.features
-    .filter((feature: any) => feature.geometry?.type === "LineString")
-    .map((feature: any, index: number): TripDatum => ({
-      path: feature.geometry.coordinates,
-      timestamps: feature.geometry.coordinates.map((_: any, i: number) => i * 2), // Simple timestamp generation
-      color: index % 2 === 0 ? [96, 165, 250] : [59, 130, 246] // RGB only for TripDatum
-    }))
+type TripDatum = {
+  path: Position[];
+  timestamps: number[];
+  color: [number, number, number];
+};
+
+// Type guard: check if a Feature is a LineString
+function isLineStringFeature<P extends GeoJsonProperties = GeoJsonProperties>(
+  f: Feature<Geometry, P> | undefined | null
+): f is Feature<LineString, P> {
+  return f?.geometry?.type === "LineString";
+}
+
+
+// Accept a single Feature or a FeatureCollection (common in callers)
+export function convertGeojsonToTrips(
+  geojson: FeatureCollection | Feature
+): TripDatum[] {
+  const fc: FeatureCollection =
+    geojson.type === "FeatureCollection"
+      ? geojson
+      : ({ type: "FeatureCollection", features: [geojson] } as FeatureCollection);
+
+  const lineFeatures = fc.features.filter(isLineStringFeature);
+
+  return lineFeatures.map((feature, index): TripDatum => {
+    const coords = feature.geometry.coordinates as Position[];
+
+    return {
+      path: coords,
+      // Simple timestamp generation (2s apart); keep length aligned with coords
+      timestamps: coords.map((_, i) => i * 2),
+      // Alternate two RGB colors
+      color: index % 2 === 0 ? [96, 165, 250] : [59, 130, 246],
+    };
+  });
 }

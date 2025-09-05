@@ -5,7 +5,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
 import RouteLayer from './RouteLayer';
-import RouteLayerWithFrequency from "./RouteLayerWithFrequency";
 
 // [TRIPS ADD]
 import { toTripsData } from '../utils/prepareTrips';

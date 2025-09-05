@@ -37,6 +37,7 @@ export default function MapHoverOverlay({
       >
         {Object.entries(f.properties || {}).map(([k, v]) => (
           <div key={k} style={{ margin: "2px 0" }}>
+            <strong>{k}:</strong> {String(v)}
           </div>
         ))}
         {!Object.keys(f?.properties || {}).length && lng != null && lat != null && (

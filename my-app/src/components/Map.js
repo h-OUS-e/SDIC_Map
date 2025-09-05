@@ -212,7 +212,7 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
+                    <RouteLayer map={map.current} url="./assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
                     {map.current && trips.length > 0 && (
                         <TripsOverlay

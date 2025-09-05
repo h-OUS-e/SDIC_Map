@@ -312,7 +312,7 @@ function fcToPointFC(fc, maxPoints = 5000) {
 
 export default function RouteLayer({
     map,
-    url = "/assets/routes/route.geojson",
+    url = "./assets/routes/route.geojson",
     sourceId = "saved-route",
     layerId = "saved-route-line",
     opacity = 1.0,

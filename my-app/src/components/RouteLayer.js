@@ -19,14 +19,14 @@ const DARK_GREEN = "#138B4F"
 
 // Parameters
 const CRAYON_WIDTH = 8
-const CRAYON_OPACITY = .2
-const START_COLOR = NEON_GREEN;
-const MID_COLOR = "#1d8f81";
-const END_COLOR = SDIC_BLUE;
+const CRAYON_OPACITY = .4
+const START_COLOR = SDIC_BLUE;
+const MID_COLOR = "#5b4fc9";
+const END_COLOR = "#933df6";
 const head_t = 100;
 const tail_t = 100;
-const inner_head_t = 1000;
-const inner_tail_t = 1000;
+const inner_head_t = 1500;
+const inner_tail_t = 2000;
 
 const showVertices = false;
 const showGradientVertices = false;
@@ -505,15 +505,15 @@ export default function RouteLayer({
             const baseZoomRadius = (k) => [
                 "interpolate", ["linear"], ["zoom"],
                 8,  20 * k,
-                12, 65 * k,
+                12, 50 * k,
                 16, 65 * k
             ];
-            const ks = [1.0, .6, , .3, .2, .1];
+            const ks = [1.0, .5, , .2, .1, .05];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-origin-glow${i+1}`, pointSrc, {
                     "circle-color": START_COLOR,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
-                    "circle-opacity": i === 0 ? 0.1 : 0.15,
+                    "circle-opacity": i === 0 ? 0.1 : 0.4,
                     "circle-blur": i === 0 ? 0.5 : 0.25,
                 });
             });
@@ -566,17 +566,17 @@ export default function RouteLayer({
             upsertGeoJSONSource(map, endSrc, endpointFC);
             const baseZoomRadius = (k) => [
                 "interpolate", ["linear"], ["zoom"],
-                10,  15 * k,
+                10,  8 * k,
                 12, 20 * k,
-                16, 65 * k
+                16, 40 * k
             ];
-            const ks = [1.0, .3, .2, .1];
+            const ks = [1.0, .6, .3, .2];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-endpoint-glow${i+1}`, endSrc, {
                     "circle-color": END_COLOR,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
-                    "circle-opacity": i === 0 ? 0.1 : 0.2,
-                    "circle-blur": i === 0 ? 0.5 : 0.25,
+                    "circle-opacity": i === ks.length ? 0.5 : 0.1,
+                    "circle-blur": i === 0 ? 0.4 : 0.25,
                 });
             });
 
@@ -787,10 +787,10 @@ export default function RouteLayer({
         }}
         >
 
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route and load address list.</div>
-        <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
+        {/* <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route and load address list.</div>
+            <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
         <div style={{ height: 8 }} />
-        <input type="file" accept=".csv,text/csv" onChange={onCsvFile} />
+        <input type="file" accept=".csv,text/csv" onChange={onCsvFile} /> */}
         </div>
         
     )

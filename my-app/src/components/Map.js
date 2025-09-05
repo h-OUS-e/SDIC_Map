@@ -220,7 +220,7 @@ export default function Map() {
                     {/* camera stable by disabling fit; expose data upward */}
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
-                    {map.current && trips.length > 0 && (
+                    {/* {map.current && trips.length > 0 && (
                         <TripsOverlay
                             map={map.current}
                             data={trips}
@@ -229,9 +229,9 @@ export default function Map() {
                             opacity={0.5}
                             lineWidth={3.1}
                         />
-                    )}
+                    )} */}
 
-                    <RouteGenerator map={map.current} apiKey={API_KEY} />
+                    {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
 
                     
                     {/* Hover overlay — point it at your endpoint hit layer (or glow layers) */}

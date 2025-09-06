@@ -23,7 +23,7 @@ const SUBTLE_BLUE: Color = [195, 221, 253] // #60a5fa - lighter blue for better 
 export default function TripsOverlay({
   map,
   data,
-  speed = 0.8, 
+  speed = 0.8,
   trail = 24,
   lineWidth = 0.05,
   fps = 30,
@@ -36,17 +36,16 @@ export default function TripsOverlay({
 
   useEffect(() => {
     if (!map || !data?.length) {
-    //   console.log("[v0] TripsOverlay: No map or data", { map: !!map, dataLength: data?.length })
       return
     }
 
-    // console.log("[v0] TripsOverlay: Starting animation with data", {
-    //   dataLength: data.length,
-    //   firstTrip: data[0],
-    //   speed,
-    //   trail,
-    //   opacity,
-    // })
+    console.log("[v0] TripsOverlay: Starting animation with data", {
+      dataLength: data.length,
+      firstTrip: data[0],
+      speed,
+      trail,
+      opacity,
+    })
 
     const baseProps = {
       id: "trips",
@@ -75,7 +74,6 @@ export default function TripsOverlay({
     map.addControl(overlay)
     overlayRef.current = overlay
 
-    // Animate with fps throttle
     t0.current = performance.now()
     lastFrame.current = 0
     const frameInterval = 1000 / fps
@@ -84,11 +82,9 @@ export default function TripsOverlay({
       const now = performance.now()
       if (now - lastFrame.current >= frameInterval) {
         const elapsed = (now - t0.current) / 1000
-        const period = 90 
-        // const currentTime = (elapsed * speed) % period
         const currentTime = elapsed * speed
 
-        // console.log("[v0] Animation frame:", { elapsed, currentTime, speed })
+        console.log("[v0] Animation frame:", { elapsed, currentTime, speed })
 
         overlay.setProps({
           layers: [

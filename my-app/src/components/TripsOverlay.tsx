@@ -2,22 +2,17 @@ import { TripsLayer } from "@deck.gl/geo-layers";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import type maplibregl from "maplibre-gl";
 import React, { useEffect, useMemo, useRef } from "react";
-import { FC, haversineMeters, toTripsData } from '../utils/prepareTrips';
+import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
 
 export type TripDatum = {
-  /** Array of [lng, lat] coordinates */
   path: [number, number][];
-  /** Per-vertex timestamps in seconds (same length as path) */
   timestamps: number[];
-  /** RGB color [0-255, 0-255, 0-255] */
   color?: [number, number, number];
 };
 
 export type Props = {
   map: maplibregl.Map | null;
   geoJSON: FC;
-  /** seconds-per-second multiplier */
-  speed?: number;
   /** seconds of tail we keep lit */
   trail?: number;
   /** line width in *pixels* */
@@ -28,12 +23,9 @@ export type Props = {
   opacity?: number;
   /** loop to start, based on max timestamp in data */
   loop?: boolean;
-  /** If provided, recompute timestamps so speed is constant across all trips */
-  metersPerSecond?: number | null;
+  /** Time-driven profile: { speeds: number[], dt?: number, dts?: number[] } */
+  timeSpeedProfile?: { speeds: number[]; dt?: number; dts?: number[] } | null;
 };
-
-
-// helpers inside TripsOverlay.tsx ---
 
 function getMaxTimestamp(arr: TripDatum[]): number {
   let maxT = 0;
@@ -47,23 +39,15 @@ function getMaxTimestamp(arr: TripDatum[]): number {
   return maxT;
 }
 
-
-
-/**
- * Deck.gl overlay that animates simplified routes as time-based trips.
- * - Uses TripsLayer with a clock driven by requestAnimationFrame.
- * - Mounts as a MapboxOverlay control on a MapLibre map instance.
- */
 export default function TripsOverlay({
-    map,
-    geoJSON,
-    speed = 10, // seconds of data shown per wall-second
-    trail = 900,
-    lineWidth = 4,
-    fps = 30,
-    opacity = 0.6,
-    loop = true,
-    metersPerSecond = null,
+  map,
+  geoJSON,
+  trail = 900,
+  lineWidth = 4,
+  fps = 30,
+  opacity = 0.6,
+  loop = true,
+  timeSpeedProfile = null,
 }: Props) {
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -71,20 +55,100 @@ export default function TripsOverlay({
   const lastTickMsRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
 
-  // Prepare geoJSON with timestamps
-  const data: TripDatum[] = toTripsData(geoJSON, metersPerSecond)
-  // console.log(`Prepared ${data.length} trips for animation.`);
+  // Prepare geoJSON with timestamps (your helper accepts these args)
+  const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
+  // Layer data
+  const layerData = useMemo(() => data, [data]);
 
-  // Create the data you actually feed to TripsLayer
-  const layerData = useMemo(() => {
-    console.log(data)
-      return data;      
-  }, [data]);
-
-  // Compute global max timestamp for looping and bounds
+  // Global max timestamp
   const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);
-    
+
+  // --- helpers for logging ---
+  // Binary search: first index with arr[idx] > x
+  const upperBound = (arr: number[], x: number) => {
+    let lo = 0,
+      hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (arr[mid] <= x) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+
+  // Approx instantaneous speed at time t by finite difference on a single trip
+  const approxSpeedFromTrip = (trip: TripDatum, t: number): number | null => {
+    const ts = trip.timestamps;
+    const path = trip.path;
+    if (!ts?.length || !path?.length) return null;
+
+    // Before the first timestamp — use first segment
+    if (t <= ts[0] && ts.length >= 2) {
+      const dt = ts[1] - ts[0];
+      const ds = haversineMeters(path[0], path[1]);
+      return ds / Math.max(1e-6, dt);
+    }
+
+    const i = upperBound(ts, t);
+    if (i <= 0) return null;
+
+    const j = Math.min(i, ts.length - 1);
+    const dt = ts[j] - ts[j - 1];
+    if (dt <= 0) return null;
+    const ds = haversineMeters(path[j - 1], path[j]);
+    return ds / dt;
+  };
+
+  // Which trip is the longest (used as a reliable fallback)
+  const longestTripIndex = useMemo(() => {
+    if (!layerData.length) return 0;
+    let best = 0;
+    let bestLast = layerData[0]?.timestamps?.slice(-1)[0] ?? 0;
+    for (let i = 1; i < layerData.length; i++) {
+      const last = layerData[i]?.timestamps?.slice(-1)[0] ?? 0;
+      if (last > bestLast) {
+        bestLast = last;
+        best = i;
+      }
+    }
+    return best;
+  }, [layerData]);
+
+  // Optionally, build theoretical v(t) from timeSpeedProfile (never runs out)
+  const speedAtTime = useMemo(() => {
+    const p = timeSpeedProfile;
+    if (!p?.speeds || p.speeds.length < 2) return null;
+
+    const s = p.speeds.map((v) => Math.max(1e-6, v));
+    const m = s.length - 1;
+    const dts =
+      p.dts && p.dts.length === m
+        ? p.dts.map((x) => Math.max(1e-6, x))
+        : new Array(m).fill(Math.max(1e-6, p.dt ?? 10));
+
+    const T = new Array(m + 1).fill(0);
+    for (let i = 0; i < m; i++) T[i + 1] = T[i] + dts[i];
+
+    return (t: number) => {
+      if (t >= T[m]) return s[m];
+      // find j with T[j] <= t < T[j+1]
+      let lo = 0,
+        hi = m;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (T[mid + 1] <= t) lo = mid + 1;
+        else hi = mid;
+      }
+      const j = lo;
+      const v0 = s[j],
+        v1 = s[j + 1],
+        tau = dts[j];
+      const a = (v1 - v0) / tau;
+      const u = t - T[j];
+      return v0 + a * u;
+    };
+  }, [timeSpeedProfile]);
 
   // Create / attach overlay
   useEffect(() => {
@@ -95,7 +159,9 @@ export default function TripsOverlay({
     }
     return () => {
       if (overlayRef.current) {
-        try { map.removeControl(overlayRef.current); } catch {}
+        try {
+          map.removeControl(overlayRef.current);
+        } catch {}
         overlayRef.current = null;
       }
     };
@@ -109,15 +175,15 @@ export default function TripsOverlay({
       opacity,
       currentTime: nowS,
       trailLength: trail,
-      getPath: d => d.path,
-      getTimestamps: d => d.timestamps,
+      getPath: (d) => d.path,
+      getTimestamps: (d) => d.timestamps,
       getColor: () => [255, 255, 255],
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,
       capRounded: true,
       jointRounded: true,
-    })
+    }),
   ];
 
   // Start/drive the animation loop whenever inputs change
@@ -143,12 +209,11 @@ export default function TripsOverlay({
 
       // Advance simulation time in seconds
       const elapsedS = (tMs - startWallMsRef.current) / 1000;
-      const nextTime = currentTimeRef.current + elapsedS * speed;
+      const nextTime = currentTimeRef.current + elapsedS
 
       // Loop or clamp
-      let current;
+      let current: number;
       if (loop && maxTs > 0) {
-        // Keep time in [0, maxTs). Using % may yield negatives if ever needed.
         current = ((nextTime % maxTs) + maxTs) % maxTs;
       } else {
         current = Math.min(nextTime, maxTs);
@@ -157,12 +222,34 @@ export default function TripsOverlay({
       currentTimeRef.current = current;
       startWallMsRef.current = tMs; // reset for delta on next frame
 
+      // -------- DEBUG LOGGING (robust) --------
+      const t = currentTimeRef.current;
+
+      // Pick a trip that's still active at time t; else fallback to longest
+      const trip =
+        layerData.find((tr) => (tr.timestamps.at(-1) ?? 0) >= t) ??
+        layerData[longestTripIndex];
+
+      if (trip) {
+        const vApprox = approxSpeedFromTrip(trip, t);
+        if (vApprox != null && Number.isFinite(vApprox)) {
+          console.log(`t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
+        }
+      }
+
+      // Optional: also log theoretical schedule v(t) if provided
+      if (speedAtTime) {
+        const vSched = speedAtTime(t);
+        console.log(`t=${t.toFixed(2)}s scheduleSpeed=${vSched.toFixed(2)} m/s`);
+      }
+      // ----------------------------------------
+
       // Push new layers to the overlay
       overlayRef.current?.setProps({ layers: makeLayers(current) });
 
       // Stop at the end if not looping
       if (!loop && current >= maxTs) {
-        rafRef.current && cancelAnimationFrame(rafRef.current);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
         return;
       }
@@ -177,11 +264,7 @@ export default function TripsOverlay({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [data, speed, lineWidth, opacity, fps, loop, maxTs]);
-
-  // If the map re-centers/zooms, overlay remains attached via MapboxOverlay
-  // and needs no special syncing here.
+  }, [layerData, lineWidth, opacity, fps, loop, maxTs, longestTripIndex, speedAtTime]);
 
   return null;
 }
-

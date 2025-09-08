@@ -223,11 +223,12 @@ export default function Map() {
                         <TripsOverlay
                             map={map.current}
                             geoJSON={geoJSON}
-                            speed={25}
+                            fps={30}
                             trail={900}
-                            opacity={.2}
-                            lineWidth={3}
-                            metersPerSecond={45}
+                            opacity={.3}
+                            lineWidth={1.5}
+                            // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                            timeSpeedProfile={{ speeds: [45, 100, 100, 500, 8000], dts: [1,3, 8, 12] }}
                         />
                     )}
 

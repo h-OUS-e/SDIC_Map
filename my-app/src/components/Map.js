@@ -256,7 +256,7 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
+                    {/* <RouteLayer map={map.current} url="/assets/routes/routes.geojson" onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} /> */}
 
                     {map.current && trips.length > 0 && (
                         <TripsOverlay
@@ -265,10 +265,8 @@ export default function Map() {
                             data={trips}
                             speed={isAutoPlaying ? 1.0 : 10.8}  // Slow down during keyframe sequence
                             trail={900}
-                            opacity={.2}
-                            lineWidth={3}
-                            metersPerSecond={45}  // ~18 km/h cycling pace
-                            loop={!isAutoPlaying}  // Disable loop when auto-playing keyframes
+                            opacity={0.9}
+                            lineWidth={3.1}
                         />
                     )}
 

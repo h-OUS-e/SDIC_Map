@@ -29,27 +29,27 @@ export function useKeyframeAnimation(map, onSequenceStart) {
       name: 'Cinematic Intro',
       keyframes: [
         {
-          center: [-122.4194, 37.7749], // SF center
-          zoom: 16, // Ultra zoomed in
+          center: [-122.40451, 37.79837], // Telegraph Hill area (white sparkly origin point)
+          zoom: 14.5, // Zoomed-in view of the origin (was 16)
           bearing: 0,
           pitch: 0,
-          duration: 8000, // 8 seconds - ultra close view
+          duration: 8000, // 8 seconds - zoomed-in view of origin
           easing: easingFunctions.easeInOut,
         },
         {
-          center: [-122.4194, 37.7749], // Same SF center
-          zoom: 14, // Slightly zoomed out
-          bearing: 45, // Start orbiting
-          pitch: 30, // Add some pitch
-          duration: 8000, // 8 seconds - orbiting view
+          center: [-122.40451, 37.79837], // Same origin point (Telegraph Hill)
+          zoom: 14, // Slightly zoomed out for orbiting
+          bearing: 60, // Subtle orbit around origin (was 180°)
+          pitch: 25, // Gentle pitch for cinematic effect (was 45°)
+          duration: 8000, // 8 seconds - gentle orbit around origin
           easing: easingFunctions.easeInOut,
         },
         {
-          center: [-122.4194, 37.7749], // Keep SF center for Bay Area view
-          zoom: 10.25, // Bay Area zoom but centered on SF
-          bearing: 0, // Top-down view
+          center: [-122.27463, 37.61096], // Exact Bay Area coordinates from your image
+          zoom: 10.25, // Exact zoom level from your image
+          bearing: 0, // Return to top-down view
           pitch: 0,
-          duration: 8000, // 8 seconds - wide view
+          duration: 8000, // 8 seconds - exact Bay Area view
           easing: easingFunctions.easeInOut,
         },
       ],
@@ -200,6 +200,11 @@ export function useKeyframeAnimation(map, onSequenceStart) {
     map.setZoom(firstKeyframe.zoom);
     map.setBearing(firstKeyframe.bearing ?? 0);
     map.setPitch(firstKeyframe.pitch ?? 0);
+    
+    // Ensure all states are properly reset
+    setIsPlaying(false);
+    setIsAutoPlaying(false);
+    isAutoPlayingRef.current = false;
   }, [map, stopAnimation]);
 
   // Initialize with first sequence

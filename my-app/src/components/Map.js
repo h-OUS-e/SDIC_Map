@@ -268,11 +268,11 @@ export default function Map() {
                             ref={tripsOverlayRef}
                             map={map.current}
                             data={trips}
-                            speed={isAutoPlaying ? 0.3 : 8}  // Much slower trip animation
+                            speed={isAutoPlaying ? 0.8 : 8}  // Faster trip animation during keyframes
                             trail={900}
                             opacity={.2}
                             lineWidth={3}
-                            metersPerSecond={45}  // ~18 km/h cycling pace
+                            metersPerSecond={null}// ~18 km/h cycling pace
                             loop={!isAutoPlaying}  // Disable loop when auto-playing keyframes
                         />
                     )}

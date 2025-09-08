@@ -67,49 +67,38 @@ export function useKeyframeAnimation(map, onSequenceStart) {
   }, [currentSequence, currentKeyframeIndex]);
 
   const animateToKeyframe = useCallback((
-    keyframe,
-    duration = 2000,
-    easing = easingFunctions.easeInOut
-  ) => {
-    if (!map) return Promise.resolve();
+  keyframe,
+  duration = 2000,
+  easing = easingFunctions.easeInOut
+) => {
+  if (!map) return Promise.resolve();
 
-    return new Promise((resolve) => {
-      const startTime = performance.now();
-      const startCenter = map.getCenter();
-      const startZoom = map.getZoom();
-      const startBearing = map.getBearing();
-      const startPitch = map.getPitch();
+  return new Promise((resolve) => {
+    // Convert your easing [0..1] -> [0..1] to a function MapLibre expects
+    const easeFn = (t) => easing(Math.min(1, Math.max(0, t)));
 
-      const animate = (currentTime) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const easedProgress = easing(progress);
+    // Use the built-in camera animator
+    map.easeTo(
+      {
+        center: keyframe.center,
+        zoom: keyframe.zoom,
+        bearing: keyframe.bearing ?? 0,
+        pitch: keyframe.pitch ?? 0,
+        duration: keyframe.duration ?? duration,
+        easing: easeFn,
+      },
+      { animate: true }
+    );
 
-        // Interpolate camera properties
-        const center = [
-          startCenter.lng + (keyframe.center[0] - startCenter.lng) * easedProgress,
-          startCenter.lat + (keyframe.center[1] - startCenter.lat) * easedProgress,
-        ];
+    // Resolve when the animation ends
+    const onIdle = () => {
+      map.off('idle', onIdle);
+      resolve();
+    };
+    map.on('idle', onIdle);
+  });
+}, [map]);
 
-        const zoom = startZoom + (keyframe.zoom - startZoom) * easedProgress;
-        const bearing = startBearing + ((keyframe.bearing ?? 0) - startBearing) * easedProgress;
-        const pitch = startPitch + ((keyframe.pitch ?? 0) - startPitch) * easedProgress;
-
-        map.setCenter(center);
-        map.setZoom(zoom);
-        map.setBearing(bearing);
-        map.setPitch(pitch);
-
-        if (progress < 1) {
-          animationRef.current = requestAnimationFrame(animate);
-        } else {
-          resolve();
-        }
-      };
-
-      animationRef.current = requestAnimationFrame(animate);
-    });
-  }, [map]);
 
   const playKeyframe = useCallback(async (keyframeIndex) => {
     if (!currentSequenceRef.current || !map) return;

@@ -2,8 +2,7 @@
 
 import Papa from "papaparse";
 import React, { useMemo, useState } from "react";
-const GOOGLE_MAPS_KEY = "AIzaSyDFTmGfQ-E8ENu8LKCHBAaWIojRwCjn900";
-// ---- Types
+const GOOGLE_MAPS_KEY = process.env.GOOGLE_API_KEY;// ---- Types
 interface Coord {
   lon: number;
   lat: number;
@@ -89,7 +88,7 @@ function haversineMeters([lon1, lat1]: number[], [lon2, lat2]: number[]) {
 // Google Routes API — returns GeoJSON already
 async function routeGoogle(
   a: Coord, b: Coord, profile: "driving"|"cycling"|"walking"
-): Promise<RouteFeature> {
+): Promise<RouteFeature[]> {
   if (!GOOGLE_MAPS_KEY) throw new Error("Missing Google Maps API key");
 
   const body = {
@@ -97,7 +96,8 @@ async function routeGoogle(
     destination:  { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
     travelMode:   toGTravelMode(profile),
     polylineEncoding: "GEO_JSON_LINESTRING",
-    polylineQuality:  "HIGH_QUALITY"
+    polylineQuality:  "HIGH_QUALITY",
+    computeAlternativeRoutes: true,
   };
 
   const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
@@ -111,31 +111,37 @@ async function routeGoogle(
   });
   if (!res.ok) throw new Error(`Google routing failed (${res.status}) for: ${a.name} → ${b.name}`);
   const data = await res.json();
-  const r = data?.routes?.[0];
-  const line = r?.polyline?.geoJsonLinestring as GeoJSON.LineString | undefined;
-  if (!line) throw new Error(`No Google route geometry for: ${a.name} → ${b.name}`);
+  const routes = (data?.routes ?? []) as Array<{
+    distanceMeters: number;
+    duration: string; // like "1234s"
+    polyline?: { geoJsonLinestring?: GeoJSON.LineString };
+  }>;
+  if (!routes.length) throw new Error(`No Google route geometry for: ${a.name} → ${b.name}`);
 
-  // optional: keep your "last meters to door" tail
-  const coords = line.coordinates.slice();
-  const last = coords[coords.length - 1];
-  const tail: [number, number] = [b.lon, b.lat];
-  const extra = haversineMeters(last, tail);
-  if (extra > 0) coords.push(tail);
+  return routes.map((r) => {
+    const line = r.polyline?.geoJsonLinestring as GeoJSON.LineString | undefined;
+    if (!line) throw new Error(`Missing polyline for: ${a.name} → ${b.name}`);
 
-  // Google returns duration like "1234s" — parse to seconds
-  const seconds = typeof r.duration === "string" ? parseFloat(r.duration.replace("s","")) : 0;
+    const coords = line.coordinates.slice();
+    const last = coords[coords.length - 1];
+    const tail: [number, number] = [b.lon, b.lat];
+    const extra = haversineMeters(last, tail);
+    if (extra > 0) coords.push(tail);
 
-  return {
-    type: "Feature",
-    properties: {
-      distance_m: r.distanceMeters,
-      duration_s: seconds,
-      from: a.name || "from",
-      to: b.name || "to",
-      profile,
-    },
-    geometry: { type: "LineString", coordinates: coords },
-  };
+    const seconds = typeof r.duration === "string" ? parseFloat(r.duration.replace("s","")) : 0;
+
+    return {
+      type: "Feature",
+      properties: {
+        distance_m: r.distanceMeters,
+        duration_s: seconds,
+        from: a.name || "from",
+        to: b.name || "to",
+        profile,
+      },
+      geometry: { type: "LineString", coordinates: coords },
+    } as RouteFeature;
+  });
 }
 
 
@@ -306,41 +312,61 @@ export default function Page() {
     const cache = new Map<string, Coord>();
     const feats: RouteFeature[] = [];
 
-    for (let i = 0; i < pairs.length; i++) {
-      const pair = pairs[i];
-      const { from, to, profile } = pair;
-      try {
-        const [a, b] = await Promise.all([
-          cache.get(from) || geocodeGoogle(from, GOOGLE_MAPS_KEY).then((c) => (cache.set(from, c), c)),
-          cache.get(to) || geocodeGoogle(to, GOOGLE_MAPS_KEY).then((c) => (cache.set(to, c), c)),
-        ]);
-        const feat = await routeGoogle(a, b, profile ?? DEFAULT_PROFILE);
-        
+    const altCache = new Map<string, RouteFeature[]>();   // key → list of alts
+  const altIndex = new Map<string, number>();           // key → next index to use
 
-        // add metadata to properties
-        const enriched: RouteFeature = {
-          ...feat,
-          properties: {
-            ...feat.properties,
-            month: pair.month,
-            class: pair.class,
-            team: pair.team,
-            original_from: pair.original_from ?? pair.from,
-            original_to: pair.original_to ?? pair.to,
-            location_name: pair.location_name,
-            activity: pair.activity,
-          },
-        };
+  for (let i = 0; i < pairs.length; i++) {
+    const pair = pairs[i];
+    const { from, to, profile } = pair;
+    try {
+      const [a, b] = await Promise.all([
+        cache.get(from) || geocodeGoogle(from, GOOGLE_MAPS_KEY).then((c) => (cache.set(from, c), c)),
+        cache.get(to)   || geocodeGoogle(to,   GOOGLE_MAPS_KEY).then((c) => (cache.set(to, c), c)),
+      ]);
 
-        feats.push(enriched);
+      // stable key by coordinates + profile (names can vary)
+      const key = `${a.lat.toFixed(6)},${a.lon.toFixed(6)}|${b.lat.toFixed(6)},${b.lon.toFixed(6)}|${(profile ?? DEFAULT_PROFILE)}`;
 
-      } catch (e: Error | unknown) {
-        console.warn("Skipping pair due to error:", from, to, e);
+      // get or fetch alternatives once
+      let alts = altCache.get(key);
+      if (!alts) {
+        alts = await routeGoogle(a, b, profile ?? DEFAULT_PROFILE);
+        // safety: if Google returned none (shouldn’t), make sure we have at least one
+        if (!alts || alts.length === 0) {
+          alts = await routeGoogle(a, b, profile ?? DEFAULT_PROFILE);
+        }
+        altCache.set(key, alts);
       }
-      setProgress({ done: i + 1, total: pairs.length });
-      // Gentle pacing for public endpoints
-      await sleep(150);
+
+      // round-robin choose a different one each time this pair repeats
+      const idx = altIndex.get(key) ?? 0;
+      const chosen = alts[idx % alts.length];
+      altIndex.set(key, idx + 1);
+
+      // enrich chosen route with your CSV metadata
+      const enriched: RouteFeature = {
+        ...chosen,
+        properties: {
+          ...chosen.properties,
+          month: pair.month,
+          class: pair.class,
+          team: pair.team,
+          original_from: pair.original_from ?? pair.from,
+          original_to: pair.original_to ?? pair.to,
+          location_name: pair.location_name,
+          activity: pair.activity,
+        },
+      };
+
+      feats.push(enriched);
+
+    } catch (e) {
+      console.warn("Skipping pair due to error:", from, to, e);
     }
+
+    setProgress({ done: i + 1, total: pairs.length });
+    await sleep(150);
+  }
 
     if (feats.length === 0) {
       setError("No routes generated. Check addresses and try again.");

@@ -6,33 +6,29 @@ import cleanCoords from "@turf/clean-coords";
 import { featureCollection, lineString } from "@turf/helpers";
 import length from "@turf/length";
 import simplify from "@turf/simplify";
-import type { Feature, FeatureCollection, GeoJSON, LineString, MultiLineString, Position } from "geojson";
-
 
 // ---------- tiny math helpers ----------
-const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
-const rad = (d: number) => (d * Math.PI) / 180;
-const deg = (r: number) => (r * 180) / Math.PI;
-const lerp = (a: Position, b: Position, t: number): Position => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const rad = (d) => (d * Math.PI) / 180;
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
-
-function metersToDegreesAtLat(meters: number, latDeg: number) {
+function metersToDegreesAtLat(meters, latDeg) {
     const metersPerDeg = 111_320 * Math.cos(rad(latDeg || 0));
     return metersPerDeg <= 0 ? 0 : meters / metersPerDeg;
 }
 
 // Replace sharp corner p1 with two points a little away from the corner.
 // Later we spline over these for a fillet-like turn.
-function filletSharp(ls: Feature<LineString>, deflectionThresholdDeg = 25, filletFraction = 0.2) {
+function filletSharp(ls, deflectionThresholdDeg = 25, filletFraction = 0.2) {
   const c = ls.geometry.coordinates;
   if (c.length < 3) return ls;
 
-  const out: Position[] = [c[0]];
+  const out = [c[0]];
   for (let i = 1; i < c.length - 1; i++) {
     const p0 = c[i - 1], p1 = c[i], p2 = c[i + 1];
 
-    const v1: [number, number] = [p1[0] - p0[0], p1[1] - p0[1]];
-    const v2: [number, number] = [p2[0] - p1[0], p2[1] - p1[1]];
+    const v1 = [p1[0] - p0[0], p1[1] - p0[1]];
+    const v2 = [p2[0] - p1[0], p2[1] - p1[1]];
     const n1 = Math.hypot(v1[0], v1[1]);
     const n2 = Math.hypot(v2[0], v2[1]);
     if (n1 === 0 || n2 === 0) { out.push(p1); continue; }
@@ -54,32 +50,27 @@ function filletSharp(ls: Feature<LineString>, deflectionThresholdDeg = 25, fille
   return lineString(out);
 }
 
-
-
 // helper: resample a LineString to uniform spacing by arc-length
 function resampleUniform(
-  ls: Feature<LineString>,
-  spacingMeters: number
-): Feature<LineString> {
+  ls,
+  spacingMeters
+) {
   const total = length(ls, { units: "meters" });
   if (total <= 0 || !isFinite(total)) return ls;
 
   // Ensure we include both endpoints with near-uniform spacing
   const steps = Math.max(1, Math.round(total / spacingMeters));
-  const coords: Position[] = [];
+  const coords = [];
   for (let i = 0; i <= steps; i++) {
     const d = (total * i) / steps;
     const pt = along(ls, d, { units: "meters" });
-    coords.push(pt.geometry.coordinates as Position);
+    coords.push(pt.geometry.coordinates);
   }
   return lineString(coords, ls.properties);
 }
 
-
-
-
 /** Fast local meters/deg scales (equirectangular) at latitude φ */
-function metersPerDegLon(latDeg: number) {
+function metersPerDegLon(latDeg) {
   return 111_320 * Math.cos(rad(latDeg || 0));
 }
 function metersPerDegLat() {
@@ -91,11 +82,11 @@ function metersPerDegLat() {
  * Very fast; good accuracy for typical route lengths.
  */
 export function resampleUniformFast(
-  ls: Feature<LineString>,
-  spacingMeters: number,
-  avgLatOverride?: number // pass avgLat you already computed to save work
-): Feature<LineString> {
-  const c = ls.geometry.coordinates as Position[];
+  ls,
+  spacingMeters,
+  avgLatOverride // pass avgLat you already computed to save work
+) {
+  const c = ls.geometry.coordinates;
   if (!c || c.length < 2 || !isFinite(spacingMeters) || spacingMeters <= 0) return ls;
 
   // 1) Precompute local meter scales and project to XY meters
@@ -126,7 +117,7 @@ export function resampleUniformFast(
 
   // 3) Decide how many output samples (include both endpoints)
   const steps = Math.max(1, Math.round(total / spacingMeters));
-  const out: Position[] = new Array(steps + 1);
+  const out = new Array(steps + 1);
 
   // 4) Walk targets with a two-pointer scan (no binary search needed)
   let seg = 0;
@@ -160,101 +151,101 @@ export function resampleUniformFast(
   };
 }
 
-
-
-
-export type SmoothOpts = {
-  simplifyToleranceMeters?: number; // 1–5m is typical
-  deflectionThresholdDeg?: number;  // round turns sharper than this
-  filletFraction?: number;          // 0..0.45, how rounded the fillet is
-  densifySegments?: number;         // add intermediate points before spline
-  spline?: boolean;                  // whether to bezier-spline the result
-  resampleSpacingMeters?: number;   // e.g. 3-10m depending on your map scale
-};
-
-
-
 export function smoothLineString(
-  coords: Position[],
-  props: Record<string, unknown> = {},
-  opts: SmoothOpts = {}
-): Feature<LineString> {
+  coords,
+  props = {},
+  opts = {}
+) {
   const {
     simplifyToleranceMeters = 2,
     deflectionThresholdDeg = 25,
     filletFraction = 0.2,
     densifySegments = 3,
     spline = true,
-    resampleSpacingMeters,           // <— new
+    resampleSpacingMeters,
   } = opts;
 
-  const avgLat = coords.reduce((s, p) => s + (p[1] || 0), 0) / Math.max(1, coords.length);
+  const avgLat =
+    coords.reduce((s, p) => s + (p[1] ?? 0), 0) / Math.max(1, coords.length);
 
   // Convert tolerance from meters to degrees at this latitude
   const tol = metersToDegreesAtLat(simplifyToleranceMeters, avgLat);
 
+  // Start as a typed Feature<LineString, P>
   let ls = lineString(coords, props);
 
   // Drop invalid or duplicate points
-  ls = cleanCoords(ls) as Feature<LineString>;
-  // Clean the line by removing vertices that don't move the line more than `tol` degrees.
+  ls = cleanCoords(ls);
+
+  // Early resample to clean clumping
   ls = resampleUniformFast(ls, 20);
 
-  ls = simplify(ls, { tolerance: tol, highQuality: true }) as Feature<LineString>;
+  // High-quality simplify in degrees
+  ls = simplify(ls, {
+    tolerance: tol,
+    highQuality: true,
+  });
+
+  // Light pass to uniformize after simplify
   ls = resampleUniformFast(ls, 25);
 
-  // // For vertices where the turn angle is sharper than the threshold, we replace the corner point with 
-  // // two points pulled back along the incoming and outgoing segments (controlled by filletFraction). 
-  // // This creates room for the spline to make a rounder turn without ballooning.
+  // Fillet sharp corners twice to open room for smoothing
   ls = filletSharp(ls, deflectionThresholdDeg, filletFraction);
-  ls = filletSharp(ls, deflectionThresholdDeg, filletFraction);
+  ls= filletSharp(ls, deflectionThresholdDeg, filletFraction);
 
+  // Optional light densify (helps spline); keep small if we'll resample later
+  const targetDensify = resampleSpacingMeters
+    ? Math.max(1, Math.min(2, densifySegments))
+    : densifySegments;
 
-  // // Light densify to help spline shape; if we're resampling later, keep this small
-  const targetDensify = resampleSpacingMeters ? Math.max(1, Math.min(2, densifySegments)) : densifySegments;
   if (targetDensify > 1) {
-    const dense: Position[] = [];
+    const dense = [];
     const c = ls.geometry.coordinates;
     for (let i = 0; i < c.length - 1; i++) {
-      const a = c[i], b = c[i + 1];
+      const a = c[i],
+        b = c[i + 1];
       dense.push(a);
-      for (let s = 1; s < targetDensify; s++) dense.push(lerp(a, b, s / targetDensify));
+      for (let s = 1; s < targetDensify; s++) {
+        dense.push(lerp(a, b, s / targetDensify));
+      }
     }
     dense.push(c[c.length - 1]);
+
     ls = lineString(dense, props);
   }
 
-  // Arc-length resample for uniform vertex spacing. This prevent clumping of vertices since
-  // curvier parts tend to hoard many vertices making the spine not smooth.
+  // Optional arc-length resample for uniform spacing
   if (resampleSpacingMeters && resampleSpacingMeters > 0) {
     ls = resampleUniformFast(ls, resampleSpacingMeters);
   }
 
   let out = ls;
 
-  // Bézier spline smooths the shape into a curvy line. The sharpness keeps it from overshooting 
-  // corners too much; resolution controls how finely it interpolates internally. We copy back props.
-  // Tip: if you ever see overshoot around hairpins, lower sharpness (toward ~0.7) or increase pre-simplification slightly.
+  // Bézier spline smoothing
   if (spline) {
-    const curved = bezierSpline(ls, { resolution: 100000, sharpness: 0.85 }) as Feature<LineString>;
-    curved.properties = props;
-    out = curved;
-  }
+    // bezierSpline loses the generic P (returns GeoJsonProperties). Reapply P.
+    const curvedBase = bezierSpline(ls, {
+      resolution: 100000,
+      sharpness: 0.85,
+    });
 
-  
+    // Reattach the original props with the desired type P
+    curvedBase.properties = props;
+
+    out = curvedBase;
+  }
 
   return out;
 }
 
-
 // Accept Feature or FeatureCollection; returns FeatureCollection with smoothed lines.
 // MultiLineString features are preserved (we smooth each part).
-export function smoothGeoJSON(input: GeoJSON, opts?: SmoothOpts): FeatureCollection<LineString | MultiLineString> {
-  const fc: FeatureCollection = (input as any).type === "FeatureCollection"
-    ? (input as FeatureCollection)
-    : featureCollection([(input as unknown) as Feature]);
+export function smoothGeoJSON(input, opts) {
+  const fc = (input).type === "FeatureCollection"
+    ? (input)
+    : featureCollection([(input)]);
 
-  const outFeatures: Feature<LineString | MultiLineString>[] = [];
+  const outFeatures = [];
 
   for (const f of fc.features) {
     if (!f?.geometry) continue;
@@ -273,7 +264,7 @@ export function smoothGeoJSON(input: GeoJSON, opts?: SmoothOpts): FeatureCollect
       });
     } else {
       // pass-through for non-lines (e.g., Points)
-      outFeatures.push(f as any);
+      outFeatures.push(f);
     }
   }
 

@@ -1,0 +1,227 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+// Easing functions
+export const easingFunctions = {
+  linear: (t) => t,
+  easeInOut: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  easeIn: (t) => t * t,
+  easeOut: (t) => t * (2 - t),
+  smooth: (t) => t * t * (3 - 2 * t), // smoothstep
+};
+
+export function useKeyframeAnimation(map, onSequenceStart) {
+  const [currentSequence, setCurrentSequence] = useState(null);
+  const [currentKeyframeIndex, setCurrentKeyframeIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  
+  const animationRef = useRef(null);
+  const startTimeRef = useRef(0);
+  const sequenceStartTimeRef = useRef(0);
+
+  // Define your keyframe sequences
+  // Timing calculated to sync with TripsOverlay: ~90 seconds for full trip cycle
+  // We'll make each keyframe sequence take exactly one trip cycle
+  const sequences = [
+    {
+      id: 'cinematic-intro',
+      name: 'Cinematic Intro',
+      keyframes: [
+        {
+          center: [-122.4194, 37.7749], // SF center
+          zoom: 16, // Ultra zoomed in
+          bearing: 0,
+          pitch: 0,
+          duration: 30000, // 30 seconds - ultra close view
+          easing: easingFunctions.easeInOut,
+        },
+        {
+          center: [-122.4194, 37.7749], // Same center
+          zoom: 14, // Slightly zoomed out
+          bearing: 45, // Start orbiting
+          pitch: 30, // Add some pitch
+          duration: 30000, // 30 seconds - orbiting view
+          easing: easingFunctions.easeInOut,
+        },
+        {
+          center: [-122.27463, 37.61096], // Bay Area center
+          zoom: 10.25, // Bay Area zoom
+          bearing: 0, // Top-down view
+          pitch: 0,
+          duration: 30000, // 30 seconds - wide view
+          easing: easingFunctions.easeInOut,
+        },
+      ],
+      totalDuration: 90000, // 90 seconds total = one complete trip cycle
+    },
+  ];
+
+  const currentSequenceRef = useRef(null);
+  const currentKeyframeIndexRef = useRef(0);
+
+  // Update refs when state changes
+  useEffect(() => {
+    currentSequenceRef.current = currentSequence;
+    currentKeyframeIndexRef.current = currentKeyframeIndex;
+  }, [currentSequence, currentKeyframeIndex]);
+
+  const animateToKeyframe = useCallback((
+    keyframe,
+    duration = 2000,
+    easing = easingFunctions.easeInOut
+  ) => {
+    if (!map) return Promise.resolve();
+
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const startCenter = map.getCenter();
+      const startZoom = map.getZoom();
+      const startBearing = map.getBearing();
+      const startPitch = map.getPitch();
+
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easedProgress = easing(progress);
+
+        // Interpolate camera properties
+        const center = [
+          startCenter.lng + (keyframe.center[0] - startCenter.lng) * easedProgress,
+          startCenter.lat + (keyframe.center[1] - startCenter.lat) * easedProgress,
+        ];
+
+        const zoom = startZoom + (keyframe.zoom - startZoom) * easedProgress;
+        const bearing = startBearing + ((keyframe.bearing ?? 0) - startBearing) * easedProgress;
+        const pitch = startPitch + ((keyframe.pitch ?? 0) - startPitch) * easedProgress;
+
+        map.setCenter(center);
+        map.setZoom(zoom);
+        map.setBearing(bearing);
+        map.setPitch(pitch);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          resolve();
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    });
+  }, [map]);
+
+  const playKeyframe = useCallback(async (keyframeIndex) => {
+    if (!currentSequenceRef.current || !map) return;
+
+    const keyframe = currentSequenceRef.current.keyframes[keyframeIndex];
+    if (!keyframe) return;
+
+    await animateToKeyframe(
+      keyframe,
+      keyframe.duration ?? 2000,
+      keyframe.easing ?? easingFunctions.easeInOut
+    );
+  }, [animateToKeyframe, map]);
+
+  const nextKeyframe = useCallback(async () => {
+    if (!currentSequenceRef.current) return;
+
+    const nextIndex = currentKeyframeIndexRef.current + 1;
+    if (nextIndex >= currentSequenceRef.current.keyframes.length) {
+      // End of sequence
+      setIsPlaying(false);
+      setIsAutoPlaying(false);
+      return;
+    }
+
+    setCurrentKeyframeIndex(nextIndex);
+    await playKeyframe(nextIndex);
+  }, [playKeyframe]);
+
+  const previousKeyframe = useCallback(async () => {
+    if (!currentSequenceRef.current) return;
+
+    const prevIndex = currentKeyframeIndexRef.current - 1;
+    if (prevIndex < 0) return;
+
+    setCurrentKeyframeIndex(prevIndex);
+    await playKeyframe(prevIndex);
+  }, [playKeyframe]);
+
+  const playSequence = useCallback(async () => {
+    if (!currentSequenceRef.current) return;
+
+    setIsPlaying(true);
+    setIsAutoPlaying(true);
+    sequenceStartTimeRef.current = performance.now();
+    
+    // Notify that sequence is starting (for TripsOverlay reset)
+    onSequenceStart?.();
+
+    // Play all keyframes in sequence
+    for (let i = 0; i < currentSequenceRef.current.keyframes.length; i++) {
+      if (!isAutoPlaying) break; // Stop if auto-play was cancelled
+      
+      setCurrentKeyframeIndex(i);
+      await playKeyframe(i);
+    }
+
+    setIsPlaying(false);
+    setIsAutoPlaying(false);
+  }, [playKeyframe, onSequenceStart]);
+
+  const stopAnimation = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    setIsPlaying(false);
+    setIsAutoPlaying(false);
+  }, []);
+
+  const resetToFirstKeyframe = useCallback(() => {
+    if (!currentSequenceRef.current || !map) return;
+    
+    stopAnimation();
+    setCurrentKeyframeIndex(0);
+    
+    const firstKeyframe = currentSequenceRef.current.keyframes[0];
+    map.setCenter(firstKeyframe.center);
+    map.setZoom(firstKeyframe.zoom);
+    map.setBearing(firstKeyframe.bearing ?? 0);
+    map.setPitch(firstKeyframe.pitch ?? 0);
+  }, [map, stopAnimation]);
+
+  // Initialize with first sequence
+  useEffect(() => {
+    if (sequences.length > 0 && !currentSequence) {
+      setCurrentSequence(sequences[0]);
+    }
+  }, [currentSequence, sequences]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    sequences,
+    currentSequence,
+    currentKeyframeIndex,
+    isPlaying,
+    isAutoPlaying,
+    totalKeyframes: currentSequence?.keyframes.length ?? 0,
+    nextKeyframe,
+    previousKeyframe,
+    playSequence,
+    stopAnimation,
+    resetToFirstKeyframe,
+    setCurrentSequence,
+  };
+}

@@ -5,12 +5,15 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
 import RouteLayer from './RouteLayer';
-import RouteLayerWithFrequency from "./RouteLayerWithFrequency";
 
 // [TRIPS ADD]
 import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
 import TripsOverlay from './TripsOverlay';
+
+// [KEYFRAME ANIMATION]
+import { useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
+import KeyframeControls from './KeyframeControls';
 
 const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 
@@ -32,6 +35,30 @@ export default function Map() {
 
     // [TRIPS ADD] animated trips data
     const [trips, setTrips] = useState([]);
+
+    // [KEYFRAME ANIMATION] Initialize keyframe animation system
+    const tripsOverlayRef = useRef(null);
+    
+    const handleSequenceStart = () => {
+        // Reset trips overlay when starting a new sequence
+        if (tripsOverlayRef.current) {
+            // Force restart of the trips animation
+            tripsOverlayRef.current.restart?.();
+        }
+    };
+
+    const {
+        currentSequence,
+        currentKeyframeIndex,
+        isPlaying,
+        isAutoPlaying,
+        totalKeyframes,
+        nextKeyframe,
+        previousKeyframe,
+        playSequence,
+        stopAnimation,
+        resetToFirstKeyframe,
+    } = useKeyframeAnimation(map.current, handleSequenceStart);
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -71,6 +98,7 @@ export default function Map() {
         map.current.on('load', () => {
             setIsMapLoaded(true);
         });
+        //hello
 
         return () => {
             map.current.remove();
@@ -142,6 +170,21 @@ export default function Map() {
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            {/* [KEYFRAME CONTROLS] */}
+            {isMapLoaded && (
+                <KeyframeControls
+                    currentKeyframeIndex={currentKeyframeIndex}
+                    totalKeyframes={totalKeyframes}
+                    isPlaying={isPlaying}
+                    isAutoPlaying={isAutoPlaying}
+                    onNext={nextKeyframe}
+                    onPrevious={previousKeyframe}
+                    onPlaySequence={playSequence}
+                    onStop={stopAnimation}
+                    onReset={resetToFirstKeyframe}
+                />
+            )}
+
             {/* A Switch button to toggle between SF zoom in and out.*/}
             <button
                 onClick={toggleView}
@@ -217,12 +260,15 @@ export default function Map() {
 
                     {map.current && trips.length > 0 && (
                         <TripsOverlay
+                            ref={tripsOverlayRef}
                             map={map.current}
                             data={trips}
-                            speed={10.8}    // tweak freely
+                            speed={isAutoPlaying ? 1.0 : 10.8}  // Slow down during keyframe sequence
                             trail={900}
-                            opacity={0.5}
-                            lineWidth={3.1}
+                            opacity={.2}
+                            lineWidth={3}
+                            metersPerSecond={45}  // ~18 km/h cycling pace
+                            loop={!isAutoPlaying}  // Disable loop when auto-playing keyframes
                         />
                     )}
 

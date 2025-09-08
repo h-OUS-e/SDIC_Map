@@ -1,19 +1,12 @@
 "use client";
 
-import { smoothGeoJSON, type SmoothOpts } from "@/utils/smoothRoute";
-import type { FeatureCollection, GeoJSON } from "geojson";
+import { smoothGeoJSON } from "@/utils/smoothRoute";
 import { useEffect, useMemo, useState } from "react";
 
-type UseSmoothRouteArgs = {
-    url?: string;                // where to fetch routes.geojson
-    data?: GeoJSON | null;       // or provide raw data directly
-    options?: SmoothOpts;
-};
-
-export function useSmoothRoute({ url = "/assets/routes/route.geojson", data, options }: UseSmoothRouteArgs) {
-    const [raw, setRaw] = useState<GeoJSON | null>(data ?? null);
-    const [loading, setLoading] = useState<boolean>(!!url && !data);
-    const [error, setError] = useState<string | null>(null);
+export function useSmoothRoute({ url = "/assets/routes/route.geojson", data, options }) {
+    const [raw, setRaw] = useState(data ?? null);
+    const [loading, setLoading] = useState(!!url && !data);
+    const [error, setError] = useState(null);
 
     // Fetch when URL is provided
     useEffect(() => {
@@ -24,9 +17,9 @@ export function useSmoothRoute({ url = "/assets/routes/route.geojson", data, opt
                 setLoading(true);
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = (await res.json()) as GeoJSON;
+                const json = await res.json();
                 if (!cancelled) setRaw(json);
-            } catch (e: unknown) {
+            } catch (e) {
                 if (!cancelled) {
                     const message = e instanceof Error ? e.message : "Failed to load GeoJSON";
                     setError(message);
@@ -39,7 +32,7 @@ export function useSmoothRoute({ url = "/assets/routes/route.geojson", data, opt
     }, [url, data]);
 
     // Smooth only when the input changes
-    const smoothed: FeatureCollection | null = useMemo(() => {
+    const smoothed = useMemo(() => {
         if (!raw) return null;
         try {
             return smoothGeoJSON(raw, options);

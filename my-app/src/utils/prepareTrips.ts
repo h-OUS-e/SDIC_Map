@@ -1,3 +1,4 @@
+import { data } from "@maptiler/sdk/dist/src"
 import type * as GeoJSON from "geojson"
 
 export type TripDatum = {
@@ -20,9 +21,9 @@ export interface RouteProps {
   month?: string
 }
 
-type FC = GeoJSON.FeatureCollection<GeoJSON.LineString, RouteProps>
+export type FC = GeoJSON.FeatureCollection<GeoJSON.LineString, RouteProps>
 
-// ---- performance helper: thin dense polylines ----
+// performance helper: thin dense polylines ----
 function thinPath(coords: [number, number][], maxPoints = 400) {
   if (coords.length <= maxPoints) return coords
   const step = Math.ceil(coords.length / maxPoints)
@@ -50,26 +51,49 @@ export function haversineMeters(a: [number, number], b: [number, number]) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+function getConstantSpeed(path: [number, number][], mps: number): number[] {
+  const ts: number[] = new Array(path.length).fill(0);
+  let cum = 0;
+  for (let i = 1; i < path.length; i++) {
+    cum += haversineMeters(path[i-1], path[i]);
+    ts[i] = cum / Math.max(1e-6, mps);
+  }
+  return ts;
+}
 
-export function toTripsData(fc: FC, maxPointsPerPath = 400): TripDatum[] {
+
+function getSpeedBySegment(path: [number, number][], target_mps: number, duration: number | null): number[] {
+  const duration_computed = Math.max(6, Math.min(duration || 60, 90))
+
+  // timestamps by cumulative distance
+  const dists: number[] = [0]
+  for (let i = 1; i < path.length; i++) {
+    dists[i] = dists[i - 1] + haversineMeters(path[i - 1], path[i])
+  }
+  const total = dists[dists.length - 1] || 1
+  const ts = dists.map((d) => (d / total) * duration_computed)
+
+  return ts
+}
+
+export function toTripsData(fc: FC, meters_per_second : number | null = 45, maxPointsPerPath = 400): TripDatum[] {
   if (!fc?.features?.length) return []
   return fc.features.map((f, index) => {
     const raw = f.geometry.coordinates as [number, number][]
-    const coords = thinPath(raw, maxPointsPerPath)
+    const path = thinPath(raw, maxPointsPerPath)
+    let timestamps: number[] = []
     const p = f.properties
 
-    const duration = Math.max(6, Math.min(Number(p.duration_s) || 60, 90))
 
-    // --- timestamps by cumulative distance ---
-    const dists: number[] = [0]
-    for (let i = 1; i < coords.length; i++) {
-      dists[i] = dists[i - 1] + haversineMeters(coords[i - 1], coords[i])
+    if (meters_per_second){
+     timestamps = getConstantSpeed(path, meters_per_second);
     }
-    const total = dists[dists.length - 1] || 1
-    const timestamps = dists.map((d) => (d / total) * duration)
+    else {
+      timestamps = getSpeedBySegment(path, meters_per_second || 45, null);
+    }
 
     return {
-      path: coords,
+      path: path,
       timestamps,
       color: SUBTLE_BLUE, // Single color for all trips
       team: p.team,

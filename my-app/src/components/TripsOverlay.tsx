@@ -13,19 +13,6 @@ export type TripDatum = {
   color?: [number, number, number];
 };
 
-export interface RouteProps {
-  distance_m: number
-  duration_s: number
-  from: string
-  to: string
-  profile: "driving" | "cycling" | "walking"
-  team?: string
-  month?: string
-}
-
-
-
-
 export type Props = {
   map: maplibregl.Map | null;
   geoJSON: FC;
@@ -47,18 +34,6 @@ export type Props = {
 
 
 // helpers inside TripsOverlay.tsx ---
-
-
-function retimeConstantSpeed(d: TripDatum, mps: number): TripDatum {
-  const path = d.path || [];
-  const ts: number[] = new Array(path.length).fill(0);
-  let cum = 0;
-  for (let i = 1; i < path.length; i++) {
-    cum += haversineMeters(path[i-1], path[i]);
-    ts[i] = cum / Math.max(1e-6, mps);
-  }
-  return { ...d, timestamps: ts };
-}
 
 function getMaxTimestamp(arr: TripDatum[]): number {
   let maxT = 0;
@@ -97,17 +72,15 @@ export default function TripsOverlay({
   const currentTimeRef = useRef<number>(0);
 
   // Prepare geoJSON with timestamps
-  console.log("Preparing trip data from geoJSON...", geoJSON);
-  const data: TripDatum[] = toTripsData(geoJSON)
-  console.log(`Prepared ${data.length} trips for animation.`);
+  const data: TripDatum[] = toTripsData(geoJSON, metersPerSecond)
+  // console.log(`Prepared ${data.length} trips for animation.`);
 
 
   // Create the data you actually feed to TripsLayer
   const layerData = useMemo(() => {
     console.log(data)
-      if (!metersPerSecond) return data;
-      return data.map(d => retimeConstantSpeed(d, metersPerSecond));
-  }, [data, metersPerSecond]);
+      return data;      
+  }, [data]);
 
   // Compute global max timestamp for looping and bounds
   const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);

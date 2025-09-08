@@ -2,6 +2,7 @@ import { TripsLayer } from "@deck.gl/geo-layers";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import type maplibregl from "maplibre-gl";
 import React, { useEffect, useMemo, useRef } from "react";
+import { FC, haversineMeters, toTripsData } from '../utils/prepareTrips';
 
 export type TripDatum = {
   /** Array of [lng, lat] coordinates */
@@ -12,9 +13,22 @@ export type TripDatum = {
   color?: [number, number, number];
 };
 
+export interface RouteProps {
+  distance_m: number
+  duration_s: number
+  from: string
+  to: string
+  profile: "driving" | "cycling" | "walking"
+  team?: string
+  month?: string
+}
+
+
+
+
 export type Props = {
   map: maplibregl.Map | null;
-  data: TripDatum[];
+  geoJSON: FC;
   /** seconds-per-second multiplier */
   speed?: number;
   /** seconds of tail we keep lit */
@@ -32,17 +46,8 @@ export type Props = {
 };
 
 
-// --- helpers inside TripsOverlay.tsx ---
-function haversineMeters(a: [number, number], b: [number, number]) {
-  const R = 6371000;
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const [lon1, lat1] = a, [lon2, lat2] = b;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const la1 = toRad(lat1), la2 = toRad(lat2);
-  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
+// helpers inside TripsOverlay.tsx ---
+
 
 function retimeConstantSpeed(d: TripDatum, mps: number): TripDatum {
   const path = d.path || [];
@@ -76,7 +81,7 @@ function getMaxTimestamp(arr: TripDatum[]): number {
  */
 export default function TripsOverlay({
     map,
-    data,
+    geoJSON,
     speed = 10, // seconds of data shown per wall-second
     trail = 900,
     lineWidth = 4,
@@ -91,15 +96,21 @@ export default function TripsOverlay({
   const lastTickMsRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
 
+  // Prepare geoJSON with timestamps
+  console.log("Preparing trip data from geoJSON...", geoJSON);
+  const data: TripDatum[] = toTripsData(geoJSON)
+  console.log(`Prepared ${data.length} trips for animation.`);
 
-    // --- create the data you actually feed to TripsLayer ---
-    const layerData = useMemo(() => {
-        if (!metersPerSecond) return data;
-        return data.map(d => retimeConstantSpeed(d, metersPerSecond));
-    }, [data, metersPerSecond]);
 
-    // Compute global max timestamp for looping and bounds
-    const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);
+  // Create the data you actually feed to TripsLayer
+  const layerData = useMemo(() => {
+    console.log(data)
+      if (!metersPerSecond) return data;
+      return data.map(d => retimeConstantSpeed(d, metersPerSecond));
+  }, [data, metersPerSecond]);
+
+  // Compute global max timestamp for looping and bounds
+  const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);
     
 
   // Create / attach overlay
@@ -193,7 +204,7 @@ export default function TripsOverlay({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [data, speed, trail, lineWidth, opacity, fps, loop, maxTs]);
+  }, [data, speed, lineWidth, opacity, fps, loop, maxTs]);
 
   // If the map re-centers/zooms, overlay remains attached via MapboxOverlay
   // and needs no special syncing here.

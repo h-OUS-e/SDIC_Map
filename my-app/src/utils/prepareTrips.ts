@@ -37,17 +37,19 @@ function thinPath(coords: [number, number][], maxPoints = 400) {
 const SUBTLE_BLUE: [number, number, number] = [59, 130, 246] // #3b82f6 - single color for subtle animation
 
 // great-circle distance in meters (fast enough for our sizes)
-function haversine(a: [number, number], b: [number, number]) {
-  const R = 6371000
-  const toRad = (x: number) => (x * Math.PI) / 180
-  const dLat = toRad(b[1] - a[1])
-  const dLon = toRad(b[0] - a[0])
-  const lat1 = toRad(a[1])
-  const lat2 = toRad(b[1])
-  const s =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  return 2 * R * Math.asin(Math.sqrt(s))
+export function haversineMeters(a: [number, number], b: [number, number]) {
+  const R = 6371000;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const [lon1, lat1] = a
+  const [lon2, lat2] = b;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const la1 = toRad(lat1)
+  const la2 = toRad(lat2);
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
+
 
 export function toTripsData(fc: FC, maxPointsPerPath = 400): TripDatum[] {
   if (!fc?.features?.length) return []
@@ -61,7 +63,7 @@ export function toTripsData(fc: FC, maxPointsPerPath = 400): TripDatum[] {
     // --- timestamps by cumulative distance ---
     const dists: number[] = [0]
     for (let i = 1; i < coords.length; i++) {
-      dists[i] = dists[i - 1] + haversine(coords[i - 1], coords[i])
+      dists[i] = dists[i - 1] + haversineMeters(coords[i - 1], coords[i])
     }
     const total = dists[dists.length - 1] || 1
     const timestamps = dists.map((d) => (d / total) * duration)

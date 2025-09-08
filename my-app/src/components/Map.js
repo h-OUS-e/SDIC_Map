@@ -6,7 +6,7 @@ import RouteGenerator from './RouteGenerator';
 import RouteLayer from './RouteLayer';
 
 // [TRIPS ADD]
-import { toTripsData } from '../utils/prepareTrips';
+// import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
 import TripsOverlay from './TripsOverlay';
 
@@ -39,8 +39,8 @@ export default function Map() {
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-    // [TRIPS ADD] animated trips data
-    const [trips, setTrips] = useState([]);
+    // route data
+    const [geoJSON, setGeoJSON] = useState([]);
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -139,13 +139,12 @@ export default function Map() {
     };
 
     // receive GeoJSON from RouteLayer; convert to trips
-    const handleGeojson = (fc) => {
+    const handleGeojson = (data) => {
         try {
-            const t = toTripsData(fc); // -> [{ path, timestamps, color }]
-            setTrips(t);
-            console.log(`[Trips] prepared ${t.length} routes`);
+            setGeoJSON(data);
+            console.log(`Finished GeoJSON data update. Prepared ${Object.keys(data.features).length} routes.`);
         } catch (e) {
-            console.error('Failed to prepare trips', e);
+            console.error('Failed to prepare geoJSON data', e);
         }
     };
 
@@ -220,15 +219,15 @@ export default function Map() {
                     {/* camera stable by disabling fit; expose data upward */}
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
 
-                    {map.current && trips.length > 0 && (
+                    {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
                         <TripsOverlay
                             map={map.current}
-                            data={trips}
-                            speed={25}    // tweak freely
+                            geoJSON={geoJSON}
+                            speed={25}
                             trail={900}
                             opacity={.2}
                             lineWidth={3}
-                            metersPerSecond={45}  // ~18 km/h cycling pace
+                            metersPerSecond={45}
                         />
                     )}
 

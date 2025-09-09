@@ -285,23 +285,6 @@ export default function Map() {
                             map={map.current}
                             layers={[`${layerId}-endpoint-hit`]}
                             offset={{ x: 14, y: 14 }}
-                            render={(f) => {
-                                // Custom content (uses whatever you copied onto endpoint properties)
-                                const p = f.properties || {};
-                                const [lng, lat] = f.geometry?.coordinates || [];
-                                const show = (v) => (v && String(v).trim().length ? v : "—");
-                                return (
-                                    <div style={{ font: "500 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-                                        <div><strong>Month:</strong> {show(p.month)}</div>
-                                        <div><strong>Team:</strong> {show(p.team)}</div>
-                                        <div><strong>Class:</strong> {show(p.class)}</div>
-                                        <div><strong>Location:</strong> {show(p.location_name)}</div>
-                                        <div><strong>Address:</strong> {show(p.address)}</div>
-                                        <div><strong>Activity:</strong> {show(p.activity)}</div>
-                                        <div><strong>Profile:</strong> {show(p.profile)}</div>
-                                    </div>
-                                );
-                            }}
                         />
                     )};
                 </>                 

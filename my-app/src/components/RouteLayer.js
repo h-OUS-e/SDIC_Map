@@ -792,26 +792,4 @@ export default function RouteLayer({
         }
     }
 
-    return (
-        <div
-        style={{
-            position: "absolute",
-            bottom: 20,
-            right: 20,
-            zIndex: 2,
-            background: "rgba(20,20,20,0.85)",
-            color: "white",
-            padding: 12,
-            border: "1px solid #444",
-            borderRadius: 8,
-        }}
-        >
-
-        {/* <div style={{ fontWeight: 600, marginBottom: 8 }}>Render saved route and load address list.</div>
-            <input type="file" accept=".geojson,application/geo+json,application/json" onChange={onFile} />
-        <div style={{ height: 8 }} />
-        <input type="file" accept=".csv,text/csv" onChange={onCsvFile} /> */}
-        </div>
-        
-    )
 }

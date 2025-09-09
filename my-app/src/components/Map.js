@@ -88,12 +88,18 @@ export default function Map() {
         zoom: 10.25,
     };
 
+    const initialView = {
+        center: [-122.43609, 37.77169], // A central point to see SF, Berkeley, and Palo Alto
+        zoom: 11,
+    };
+
+
     // Initialize map
     useEffect(() => {
         if (map.current || !mapContainer.current) return;
 
         // Use the initial SF view when the map loads
-        const initialState = sfView;
+        const initialState = initialView;
 
         map.current = new maplibregl.Map({
             container: mapContainer.current,

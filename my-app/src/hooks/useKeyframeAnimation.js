@@ -11,7 +11,7 @@ export const easingFunctions = {
   smooth: (t) => t * t * (3 - 2 * t), // smoothstep
 };
 
-export function useKeyframeAnimation(map, onSequenceStart) {
+export function useKeyframeAnimation(map, onSequenceStart, { autoStart = true } = {}) {
   const [currentSequence, setCurrentSequence] = useState(null);
   const [currentKeyframeIndex, setCurrentKeyframeIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -20,6 +20,7 @@ export function useKeyframeAnimation(map, onSequenceStart) {
   const animationRef = useRef(null);
   const sequenceStartTimeRef = useRef(0);
   const isAutoPlayingRef = useRef(false);
+  const autoplayStartedRef = useRef(false);
 
   // Define your keyframe sequences
   // Faster camera transitions with SF-centered Bay Area view
@@ -203,14 +204,36 @@ export function useKeyframeAnimation(map, onSequenceStart) {
     }
   }, [currentSequence, sequences]);
 
-  // Cleanup on unmount
+  // 🔥 Autoplay when the map is ready and a sequence exists
   useEffect(() => {
+    if (!autoStart || autoplayStartedRef.current) return;
+    if (!map || !currentSequence) return;
+
+    const start = () => {
+      if (autoplayStartedRef.current) return;
+      autoplayStartedRef.current = true;
+
+      setCurrentKeyframeIndex(0);
+
+      // Kick off the sequence
+      playSequence();
+    };
+
+    // Start immediately if map is already loaded, otherwise wait once
+    const isLoaded = typeof map.loaded === 'function' ? map.loaded() : true;
+    if (isLoaded) {
+      start();
+    } else {
+      map.once('load', start);
+    }
+    
+    // Cleanup on unmount if effect reruns/unmounts
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, []);
+  }, [autoStart, map, currentSequence, playSequence]);
 
   return {
     sequences,

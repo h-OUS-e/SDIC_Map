@@ -19,7 +19,7 @@ export default function KeyframeControls({
   viewInfo = null,
 }) {
 
-  const [isHidden, setIsHidden] = React.useState(false);
+  const [isHidden, setIsHidden] = React.useState(true);
 
 
   // Frosted glass panel

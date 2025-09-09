@@ -68,7 +68,7 @@ export default function Map() {
         playSequence,
         stopAnimation,
         resetToFirstKeyframe,
-    } = useKeyframeAnimation(map.current, handleSequenceStart);
+    } = useKeyframeAnimation(map.current, handleSequenceStart, { autoStart: true });
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({

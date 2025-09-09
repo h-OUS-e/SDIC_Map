@@ -215,7 +215,7 @@ export default function Map() {
                             opacity={.3}
                             lineWidth={1.5}
                             // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                            timeSpeedProfile={{ speeds: [45, 100, 100, 500, 8000], dts: [1,3, 8, 12] }}
+                            timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
                         />
                     )}
 

@@ -19,10 +19,10 @@ const DARK_GREEN = "#138B4F"
 
 // Parameters
 const CRAYON_WIDTH = 8
-const CRAYON_OPACITY = .3
-const START_COLOR = "#ffffff";
+const CRAYON_OPACITY = .2
+const START_COLOR = "#a8cbff";
 const MID_COLOR = SDIC_BLUE;
-const END_COLOR = "#8b60f7";
+const END_COLOR = "#c0effc"; // 8b60f7
 const head_t = 100;
 const tail_t = 100;
 const inner_head_t = 1500;
@@ -524,9 +524,9 @@ export default function RouteLayer({
             upsertGeoJSONSource(map, pointSrc, pointFC);
             const baseZoomRadius = (k) => [
                 "interpolate", ["linear"], ["zoom"],
-                8,  20 * k,
-                12, 50 * k,
-                16, 65 * k
+                8,  10 * k,
+                12, 30 * k,
+                16, 60  * k
             ];
             const ks = [1.0, .5, .4 , .3, .2, .15];
             ks.forEach((k, i) => {
@@ -587,15 +587,15 @@ export default function RouteLayer({
             const baseZoomRadius = (k) => [
                 "interpolate", ["linear"], ["zoom"],
                 10,  8 * k,
-                12, 20 * k,
-                16, 40 * k
+                12, 13 * k,
+                16, 35 * k
             ];
-            const ks = [1.3, .42, .35, .27];
+            const ks = [.5, .22, .35, .27];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-endpoint-glow${i+1}`, endSrc, {
                     "circle-color": END_COLOR,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
-                    "circle-opacity": i === ks.length - 1 ? 0.5 : 0.1,
+                    "circle-opacity": i === ks.length - 1 ? 0.3 : 0.1,
                     "circle-blur": i === ks.length - 1 ? 0.5 : 0.3,
                 });
             });

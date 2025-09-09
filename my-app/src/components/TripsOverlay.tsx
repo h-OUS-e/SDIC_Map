@@ -177,7 +177,7 @@ export default function TripsOverlay({
       trailLength: trail,
       getPath: (d) => d.path,
       getTimestamps: (d) => d.timestamps,
-      getColor: () => [255, 255, 255],
+      getColor: () => [168, 203, 255],
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,

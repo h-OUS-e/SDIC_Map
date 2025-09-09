@@ -190,71 +190,14 @@ export default function Map() {
                     onPlaySequence={playSequence}
                     onStop={stopAnimation}
                     onReset={resetToFirstKeyframe}
+                    onToggleView={toggleView}
+                    isZoomedOut={isZoomedOut}
+                    onToggleSmoothed={toggleSmoothed}
+                    showSmoothed={showSmoothed}
+                    viewInfo={viewInfo}
                 />
             )}
 
-            {/* A Switch button to toggle between SF zoom in and out.*/}
-            <button
-                onClick={toggleView}
-                style={{
-                position: 'absolute',
-                top: '20px',
-                left: '20px',
-                zIndex: 1, // Ensure button is on top of the map
-                padding: '10px 15px',
-                backgroundColor: '#333',
-                color: 'white',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                }}
-            >
-                {isZoomedOut ? 'Zoom to San Francisco' : 'Zoom to Bay Area'}
-            </button>
-
-            {/* Smoothed/original toggle */}
-            <button
-                onClick={toggleSmoothed}
-                aria-pressed={showSmoothed}
-                style={{
-                    position: 'absolute',
-                    top: '60px',            // stacked below the first button
-                    left: '20px',
-                    zIndex: 1,
-                    padding: '10px 15px',
-                    backgroundColor: showSmoothed ? '#3b82f6' : '#333',
-                    color: 'white',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                }}
-                >
-                {showSmoothed ? 'Show Original' : 'Show Smooth'}
-            </button>
-
-            {/* on-map readout */}
-            <div
-                style={{
-                position: 'absolute',
-                left: '20px',
-                bottom: '20px',
-                zIndex: 1,
-                background: 'rgba(0,0,0,0.6)',
-                color: '#fff',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                fontFamily: 'monospace',
-                fontSize: '13px',
-                pointerEvents: 'none', 
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                }}
-            >
-                lng: {viewInfo.lng.toFixed(5)} | lat: {viewInfo.lat.toFixed(5)} | zoom:{' '}
-                {viewInfo.zoom.toFixed(2)}
-            </div>
 
             <div ref={mapContainer} className="map" style={{ width: '100%', height: '100%' }} />
             {isMapLoaded && (

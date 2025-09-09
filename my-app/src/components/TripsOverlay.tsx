@@ -23,6 +23,8 @@ export type Props = {
   opacity?: number;
   /** loop to start, based on max timestamp in data */
   loop?: boolean;
+  /** seconds to pause at the end before looping */
+  loopDelay?: number; 
   /** Time-driven profile: { speeds: number[], dt?: number, dts?: number[] } */
   timeSpeedProfile?: { speeds: number[]; dt?: number; dts?: number[] } | null;
 };
@@ -46,6 +48,7 @@ export default function TripsOverlay({
   lineWidth = 4,
   fps = 30,
   opacity = 0.6,
+  loopDelay = 5, 
   loop = true,
   timeSpeedProfile = null,
 }: Props) {
@@ -54,6 +57,7 @@ export default function TripsOverlay({
   const startWallMsRef = useRef<number | null>(null);
   const lastTickMsRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
+  const holdUntilRef = useRef<number | null>(null);
 
   // Prepare geoJSON with timestamps (your helper accepts these args)
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
@@ -189,6 +193,7 @@ export default function TripsOverlay({
   // Start/drive the animation loop whenever inputs change
   useEffect(() => {
     if (!overlayRef.current) return;
+    
 
     // Reset clock
     startWallMsRef.current = null;
@@ -214,10 +219,27 @@ export default function TripsOverlay({
       // Loop or clamp
       let current: number;
       if (loop && maxTs > 0) {
-        current = ((nextTime % maxTs) + maxTs) % maxTs;
+      if (holdUntilRef.current != null) {
+        if (tMs < holdUntilRef.current) {
+          current = maxTs - 1e-6; // parked just shy of the end
+        } else {
+          holdUntilRef.current = null;
+          current = 0;
+          startWallMsRef.current = tMs; // reset integration
+        }
       } else {
-        current = Math.min(nextTime, maxTs);
+        const candidate = currentTimeRef.current + elapsedS;
+        if (candidate >= maxTs && (loopDelay ?? 0) > 0) {
+          current = maxTs - 1e-6;
+          holdUntilRef.current = tMs + (loopDelay! * 1000);
+        } else {
+          current = candidate % maxTs;
+        }
       }
+    } else {
+      current = Math.min(nextTime, maxTs);
+    }
+
 
       currentTimeRef.current = current;
       startWallMsRef.current = tMs; // reset for delta on next frame
@@ -264,7 +286,7 @@ export default function TripsOverlay({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [layerData, lineWidth, opacity, fps, loop, maxTs, longestTripIndex, speedAtTime]);
+  }, [layerData, lineWidth, opacity, fps, loop, maxTs, loopDelay, longestTripIndex, speedAtTime]);
 
   return null;
 }

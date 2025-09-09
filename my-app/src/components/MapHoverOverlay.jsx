@@ -22,21 +22,73 @@ export default function MapHoverOverlay({
     const [pos, setPos] = useState({ x: 0, y: 0 });
     const [feat, setFeat] = useState(null);
     const cleanupFnsRef = useRef([]);
-
+    
     // simple default content
+    // Samsung font styles
+    const samsungFontStyle = {
+        fontFamily: "'SamsungSharpSans', 'SamsungOne', system-ui, -apple-system, sans-serif",
+        fontWeight: 400,
+        fontSize: "13px",
+        lineHeight: "1.5",
+        color: "rgba(255, 255, 255, 0.95)",
+        letterSpacing: "0.01em"
+    };
+
+    // simple default content with glassmorphism styling
     const defaultRender = (f) => {
         if (!f) return null;
         const c = f.geometry?.coordinates;
         const [lng, lat] = Array.isArray(c) ? c : [];
         return (
-            <div style={{ font: "500 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif", color: "#111" }}>
+            <div style={samsungFontStyle}>
                 {Object.entries(f.properties || {}).map(([k, v]) => (
-                <div key={k} style={{ margin: "2px 0" }}>
-                    <strong>{k}:</strong> {String(v)}
+                <div key={k} style={{ 
+                    margin: "4px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                }}>
+                    <span style={{ 
+                        fontWeight: 600,
+                        color: "rgba(255, 255, 255, 0.8)",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em"
+                    }}>
+                        {k}:
+                    </span>
+                    <span style={{ 
+                        color: "rgba(255, 255, 255, 0.95)",
+                        fontWeight: 400
+                    }}>
+                        {String(v)}
+                    </span>
                 </div>
                 ))}
                 {!Object.keys(f?.properties || {}).length && (lng != null && lat != null) && (
-                <div><strong>Coords:</strong> {lat.toFixed(5)}, {lng.toFixed(5)}</div>
+                <div style={{ 
+                    margin: "4px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                }}>
+                    <span style={{ 
+                        fontWeight: 600,
+                        color: "rgba(255, 255, 255, 0.8)",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em"
+                    }}>
+                        Coords:
+                    </span>
+                    <span style={{ 
+                        color: "rgba(255, 255, 255, 0.95)",
+                        fontWeight: 400,
+                        fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', monospace"
+                    }}>
+                        {lat.toFixed(5)}, {lng.toFixed(5)}
+                    </span>
+                </div>
                 )}
             </div>
         );
@@ -109,16 +161,30 @@ export default function MapHoverOverlay({
                 transform: "translate(0, 0)",
                 pointerEvents: "none",
                 zIndex: 3,
-                background: "white",
-                color: "#111",
-                borderRadius: 8,
-                padding: "8px 10px",
-                boxShadow: "0 6px 24px rgba(0,0,0,0.18)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                maxWidth: 280,
-                // adapt to hi-dpi text
+                // Glassmorphism background
+                background: "rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                // Neo-morphism borders and shadows
+                borderRadius: "16px",
+                padding: "12px 16px",
+                maxWidth: 300,
+                // Neo-morphism shadow system
+                boxShadow: `
+                    0 8px 32px rgba(0, 0, 0, 0.12),
+                    0 2px 8px rgba(0, 0, 0, 0.08),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                    inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `,
+                // Subtle border with glass effect
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                // Typography enhancements
                 WebkitFontSmoothing: "antialiased",
-                MozOsxFontSmoothing: "grayscale"
+                MozOsxFontSmoothing: "grayscale",
+                // Subtle animation on hover
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                // Ensure text is readable
+                color: "rgba(255, 255, 255, 0.95)"
             }}
         >
             {render ? render(feat) : defaultRender(feat)}

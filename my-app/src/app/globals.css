@@ -1,6 +1,47 @@
 @import "tailwindcss";
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
+/* Samsung Fonts */
+@font-face {
+  font-family: 'SamsungSharpSans';
+  src: url('/fonts/SamsungSharpSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SamsungSharpSans';
+  src: url('/fonts/SamsungSharpSans-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SamsungSharpSans';
+  src: url('/fonts/SamsungSharpSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SamsungOne';
+  src: url('/fonts/SamsungOne-300_v1.0.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SamsungOne';
+  src: url('/fonts/SamsungOne-600_v1.0.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

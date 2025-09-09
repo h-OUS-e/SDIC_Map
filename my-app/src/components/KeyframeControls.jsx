@@ -18,6 +18,10 @@ export default function KeyframeControls({
   onToggleSmoothed = () => {},
   viewInfo = null,
 }) {
+
+  const [isHidden, setIsHidden] = React.useState(false);
+
+
   // Frosted glass panel
   const panelStyle = {
     position: "absolute",
@@ -129,8 +133,98 @@ export default function KeyframeControls({
     onMouseUp: (e) => (e.currentTarget.style.transform = "scale(1)"),
   });
 
+  const hotspotStyle = {
+    position: "fixed",
+    top: 0,
+    right: 0,
+    width: 72,   // adjust hit area as desired
+    height: 72,
+    opacity: 0,  // invisible but still clickable
+    background: "transparent",
+    border: "none",
+    zIndex: 11,  // above most content
+    cursor: "pointer",
+    // show a focus ring if keyboard users tab to it
+    outline: "none",
+  };
+
+  const hotspotBase = {
+    position: "fixed",
+    top: 15,
+    right: 15,
+    width: 72,
+    height: 72,
+    opacity: 0, // invisible until hover/focus
+    background: "transparent",
+    border: "1px solid transparent",
+    borderRadius: 14,
+    zIndex: 11,
+    cursor: "pointer",
+    outline: "none",
+    transition:
+      "opacity 160ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 120ms ease",
+  };
+
+  const hotspotHover = {
+    // frosted glass + glow
+    opacity: 1,
+    background: "rgba(17, 25, 40, 0.45)",
+    border: "1px solid rgba(255, 255, 255, 0.16)",
+    backdropFilter: "blur(12px) saturate(160%)",
+    WebkitBackdropFilter: "blur(12px) saturate(160%)",
+    boxShadow:
+      "0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px rgba(59,130,246,0.55)",
+    borderRadius: 14,
+  };
+
+  if (isHidden) {
+    return (
+      <button
+        aria-label="Show keyframe controls"
+        title="Show controls"
+        style={hotspotBase}
+        onMouseEnter={(e) => Object.assign(e.currentTarget.style, hotspotHover)}
+        onMouseLeave={(e) => Object.assign(e.currentTarget.style, hotspotBase)}
+        onFocus={(e) => Object.assign(e.currentTarget.style, hotspotHover)} // keyboard support
+        onBlur={(e) => Object.assign(e.currentTarget.style, hotspotBase)}
+        onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+        onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        onClick={() => setIsHidden(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsHidden(false);
+          }
+        }}
+      >
+        <span style={srOnly}>Show keyframe controls</span>
+      </button>
+    );
+  }
+
   return (
     <div style={panelStyle}>
+
+      {/* close (hide) button in the panel's top-right */}
+      <button
+        onClick={() => setIsHidden(true)}
+        aria-label="Hide controls"
+        title="Hide controls"
+        style={{
+          ...withHover({ ...iconBtn, fontSize: 16 }, iconBtnHover),
+          position: "absolute",
+          top: 8,
+          right: 8,
+          width: 28,
+          height: 28,
+          lineHeight: "28px",
+          borderRadius: 8,
+        }}
+      >
+        ×
+        <span style={srOnly}>Hide</span>
+      </button>
+
       <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.02em" }}>
         Camera Keyframes
       </div>

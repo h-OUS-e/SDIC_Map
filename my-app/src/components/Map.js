@@ -107,8 +107,8 @@ export default function Map() {
             container: mapContainer.current,
             // style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
             // style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-            b59a-96734dcc38bf/?key=${API_KEY2}`,
-            // style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
-            style: `https://api.maptiler.com/maps/01993504-3098-7ba1-b982-0d03e511e2ca/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
+            style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
+            // style: `https://api.maptiler.com/maps/01993504-3098-7ba1-b982-0d03e511e2ca/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
             zoom: initialState.zoom,
         });
 

@@ -145,7 +145,8 @@ export default function Map() {
 
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
+            // style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
+            style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
             center: initialState.center,
             zoom: initialState.zoom,
         });

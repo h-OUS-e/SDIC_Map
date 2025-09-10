@@ -1,5 +1,7 @@
-import { data } from "@maptiler/sdk/dist/src"
-import type * as GeoJSON from "geojson"
+import { data } from "@maptiler/sdk/dist/src";
+import type * as GeoJSON from "geojson";
+import { COLOR_MODES, MONTH_PALETTE, TEAM_PALETTE } from '../components/RouteLayer';
+
 
 export type TripDatum = {
   path: [number, number][]
@@ -194,6 +196,7 @@ export function toTripsData(fc: FC, timeSpeedProfile: { speeds: number[]; dt?: n
     const path = thinPath(raw, maxPointsPerPath)
     let timestamps: number[] = []
     const p = f.properties
+    console.log("TEST", JSON.stringify(f))
 
     if (timeSpeedProfile) {
       // Accelerating profile from start->end speed

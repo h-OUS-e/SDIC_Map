@@ -33,13 +33,13 @@ const showGradientVertices = false;
 
 export const COLOR_MODES = { NONE: "none", TEAM: "team", MONTH: "month" };
 
-const MONTH_PALETTE = {
+export const MONTH_PALETTE = {
   January:"#2563eb", February:"#ef4444", March:"#10b981", April:"#f59e0b",
   May:"#8b5cf6", June:"#06b6d4", July:"#f43f5e", August:"#22c55e",
   September:"#a855f7", October:"#eab308", November:"#3b82f6", December:"#d946ef"
 };
 
-const TEAM_PALETTE = {
+export const TEAM_PALETTE = {
   "Ambient/MX Devices": "#06b6d4",
   // ...add known teams here if you want specific colors
 };
@@ -465,7 +465,7 @@ export default function RouteLayer({
         if (lastSentRef.current !== smoothedFC) {
             lastSentRef.current = smoothedFC;
             try {
-                onData(smoothedFC); // <- sends the displayed collection (smoothed or original) to the parent
+                onData(smoothedFC); // sends the displayed collection (smoothed or original) to the parent
                 // console.debug("[RouteLayer] onData sent FC with", fc.features.length, "features");
             } catch (err) {
                 console.error("[RouteLayer] onData failed:", err);
@@ -520,6 +520,7 @@ export default function RouteLayer({
             const origProps = originalFC?.features?.[i]?.properties || {};
             const idxProps  = fcIndexed?.features?.[i]?.properties || {};
             const props     = Object.keys(origProps).length ? origProps : idxProps;
+            console.log("TEST 2", props)
 
             // pick base color per feature according to color mode
             const BASE = getFeatureColor(props, colorBy, END_COLOR);
@@ -654,9 +655,9 @@ export default function RouteLayer({
                     };
 
                     return {
-                    type: "Feature",
-                    geometry: { type: "Point", coordinates: coord },
-                    properties: props,
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: coord },
+                        properties: props,
                     };
                 }),
             };

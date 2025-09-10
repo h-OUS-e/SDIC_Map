@@ -8,7 +8,7 @@ import RouteLayer, { COLOR_MODES } from './RouteLayer';
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
-import TripsOverlay from './TripsOverlay';
+import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
 import { useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
@@ -217,7 +217,19 @@ export default function Map() {
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed}  colorMode={colorMode}/>
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
-                        <TripsOverlay
+                        // <TripsOverlay
+                        //     ref={tripsOverlayRef}
+                        //     map={map.current}
+                        //     geoJSON={geoJSON}
+                        //     fps={30}
+                        //     trail={900}
+                        //     opacity={.3}
+                        //     lineWidth={1.5}
+                        //     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                        //     timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
+                        // />
+
+                        <TripsOverlaySeries
                             ref={tripsOverlayRef}
                             map={map.current}
                             geoJSON={geoJSON}
@@ -225,8 +237,11 @@ export default function Map() {
                             trail={900}
                             opacity={.3}
                             lineWidth={1.5}
-                            // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                            timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
+                            colorMode="month"        // "none" | "team" | "month"
+                            autoplayGroups={true}
+                            groupPause={2}
+                            loop={true}
+                            loopDelay={3}
                         />
                     )}
 

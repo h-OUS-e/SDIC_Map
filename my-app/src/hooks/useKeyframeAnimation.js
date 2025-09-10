@@ -1,252 +1,310 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
-// Easing functions
+
+// Easing functions (customize as needed)
 export const easingFunctions = {
   linear: (t) => t,
-  easeInOut: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  easeInOut: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
   easeIn: (t) => t * t,
   easeOut: (t) => t * (2 - t),
   smooth: (t) => t * t * (3 - 2 * t), // smoothstep
 };
 
-export function useKeyframeAnimation(map, onSequenceStart, { autoStart = true } = {}) {
-  const [currentSequence, setCurrentSequence] = useState(null);
-  const [currentKeyframeIndex, setCurrentKeyframeIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  
-  const animationRef = useRef(null);
-  const sequenceStartTimeRef = useRef(0);
-  const isAutoPlayingRef = useRef(false);
-  const autoplayStartedRef = useRef(false);
+/**
+ * @typedef {Object} Keyframe
+ * @property {[number, number]} center [lng, lat]
+ * @property {number} zoom
+ * @property {number} [bearing=0]
+ * @property {number} [pitch=0]
+ * @property {number} [duration=2000] ms
+ * @property {(t:number)=>number} [easing=easingFunctions.easeInOut]
+ */
 
-  // Define your keyframe sequences
-  // Faster camera transitions with SF-centered Bay Area view
-  const sequences = [
-    {
-      id: 'cinematic-intro',
-      name: 'Cinematic Intro',
-      keyframes: [
-        {
-          center: [-122.40451, 37.79837], // Telegraph Hill area (white sparkly origin point)
-          zoom: 14.5, // Zoomed-in view of the origin (was 16)
-          bearing: 0,
-          pitch: 0,
-          duration: 8000, // 8 seconds - zoomed-in view of origin
-          easing: easingFunctions.easeInOut,
-        },
-        {
-          center: [-122.40451, 37.79837], // Same origin point (Telegraph Hill)
-          zoom: 14, // Slightly zoomed out for orbiting
-          bearing: 60, // Subtle orbit around origin (was 180°)
-          pitch: 25, // Gentle pitch for cinematic effect (was 45°)
-          duration: 8000, // 8 seconds - gentle orbit around origin
-          easing: easingFunctions.easeInOut,
-        },
-        {
-          center: [-122.27463, 37.61096], // Exact Bay Area coordinates from your image
-          zoom: 10.25, // Exact zoom level from your image
-          bearing: 0, // Return to top-down view
-          pitch: 0,
-          duration: 8000, // 8 seconds - exact Bay Area view
-          easing: easingFunctions.easeInOut,
-        },
-      ],
-      totalDuration: 24000, // 24 seconds total - much faster
-    },
-  ];
+/**
+ * Simplified, reliable keyframe animation hook for Mapbox GL/MapLibre maps.
+ *
+ * @param {any} map - Map instance (Mapbox GL JS / MapLibre)
+ * @param {Keyframe[]} initialKeyframes - Array of keyframes for the sequence
+ * @param {{
+ *   autoStart?: boolean,
+ *   autoResetOnEnd?: boolean,
+ *   onStart?: () => void,
+ *   onEnd?: () => void
+ * }} opts
+ */
+export function useKeyframeAnimation(
+  map,
+  initialKeyframes = [],
+  { autoStart = true, autoResetOnEnd = false, onStart, onEnd } = {}
+) {
+  // --- State
+  const [keyframes, setKeyframes] = useState(initialKeyframes);
+  const [index, setIndex] = useState(0); // current keyframe index
+  const [status, setStatus] = useState/** @type {'idle'|'playing'|'paused'} */("idle");
 
-  const currentSequenceRef = useRef(null);
-  const currentKeyframeIndexRef = useRef(0);
+  // Derived
+  const total = keyframes.length;
+  const isPlaying = status === "playing";
+  const isPaused = status === "paused";
 
-  // Update refs when state changes
-  useEffect(() => {
-    currentSequenceRef.current = currentSequence;
-    currentKeyframeIndexRef.current = currentKeyframeIndex;
-  }, [currentSequence, currentKeyframeIndex]);
+  // --- Refs (to avoid stale closures in async loops)
+  const indexRef = useRef(index);
+  const statusRef = useRef(status);
+  const keyframesRef = useRef(keyframes);
+  const controllerRef = useRef/** @type {AbortController | null} */(null);
+  const autoStartedRef = useRef(false);
+  const pausedViewRef = useRef/** @type {null | {center:[number,number],zoom:number,bearing:number,pitch:number}} */(null);
 
-  const animateToKeyframe = useCallback((
-  keyframe,
-  duration = 2000,
-  easing = easingFunctions.easeInOut
-) => {
-  if (!map) return Promise.resolve();
+  useEffect(() => { indexRef.current = index; }, [index]);
+  useEffect(() => { statusRef.current = status; console.log("TEST 5", status)}, [status]);
+  useEffect(() => { keyframesRef.current = keyframes; }, [keyframes]);
 
-  return new Promise((resolve) => {
-    // Convert your easing [0..1] -> [0..1] to a function MapLibre expects
-    const easeFn = (t) => easing(Math.min(1, Math.max(0, t)));
-
-    // Use the built-in camera animator
-    map.easeTo(
-      {
-        center: keyframe.center,
-        zoom: keyframe.zoom,
-        bearing: keyframe.bearing ?? 0,
-        pitch: keyframe.pitch ?? 0,
-        duration: keyframe.duration ?? duration,
-        easing: easeFn,
-      },
-      { animate: true }
-    );
-
-    // Resolve when the animation ends
-    const onIdle = () => {
-      map.off('idle', onIdle);
-      resolve();
+  // --- Helpers
+  const getSnapshot = useCallback(() => {
+    if (!map) return null;
+    const c = typeof map.getCenter === "function" ? map.getCenter() : { lng: 0, lat: 0 };
+    return {
+      center: [c.lng, c.lat],
+      zoom: typeof map.getZoom === "function" ? map.getZoom() : 0,
+      bearing: typeof map.getBearing === "function" ? map.getBearing() : 0,
+      pitch: typeof map.getPitch === "function" ? map.getPitch() : 0,
     };
-    map.on('idle', onIdle);
-  });
-}, [map]);
+  }, [map]);
 
+  const abortInFlight = useCallback(() => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    if (map && typeof map.stop === "function") map.stop();
+  }, [map]);
 
-  const playKeyframe = useCallback(async (keyframeIndex) => {
-    if (!currentSequenceRef.current || !map) return;
+  const jumpTo = useCallback((kf) => {
+    if (!map || !kf) return;
+    map.jumpTo({
+      center: kf.center,
+      zoom: kf.zoom,
+      bearing: kf.bearing ?? 0,
+      pitch: kf.pitch ?? 0,
+    });
+  }, [map]);
 
-    const keyframe = currentSequenceRef.current.keyframes[keyframeIndex];
-    if (!keyframe) return;
+  const animateTo = useCallback((kf, signal) => {
 
-    await animateToKeyframe(
-      keyframe,
-      keyframe.duration ?? 2000,
-      keyframe.easing ?? easingFunctions.easeInOut
-    );
-  }, [animateToKeyframe, map]);
+    if (!map || !kf) return Promise.resolve();
+    if (signal?.aborted) return Promise.resolve();
+    return new Promise((resolve) => {
+      const duration = kf.duration ?? 2000;
+      const easing = kf.easing ?? easingFunctions.easeInOut;
 
-  const nextKeyframe = useCallback(async () => {
-    if (!currentSequenceRef.current) return;
+      const onDone = () => {
+        map.off("idle", onDone);
+        map.off("moveend", onDone);
+        signal?.removeEventListener?.("abort", onAbort);
+        resolve();
+      };
 
-    const nextIndex = currentKeyframeIndexRef.current + 1;
-    if (nextIndex >= currentSequenceRef.current.keyframes.length) {
-      // End of sequence
-      setIsPlaying(false);
-      setIsAutoPlaying(false);
-      return;
+      const onAbort = () => {
+        if (typeof map.stop === "function") map.stop();
+        onDone();
+      };
+
+      signal?.addEventListener?.("abort", onAbort, { once: true });
+      map.once("idle", onDone);
+      map.once("moveend", onDone);
+
+      map.easeTo(
+        {
+          center: kf.center,
+          zoom: kf.zoom,
+          bearing: kf.bearing ?? 0,
+          pitch: kf.pitch ?? 0,
+          duration,
+          easing: (t) => easing(Math.max(0, Math.min(1, t))),
+        },
+        { animate: true }
+      );
+    });
+  }, [map]);
+
+  // --- Controls
+  const play = useCallback(async () => {
+    if (!map || total === 0) return;
+    
+    // Prepare
+    abortInFlight();
+    controllerRef.current = new AbortController();
+
+    setStatus("playing");
+    onStart?.();
+
+    // If we finished before, optionally reset to 0 for a fresh play
+    let start = indexRef.current;
+    if (start >= total) start = 0;
+
+    // Play from current index to end
+    for (let i = start; i < total; i++) {
+      console.log("TEST", statusRef.current)
+      if (statusRef.current !== "playing") break;
+      setIndex(i);
+      await animateTo(keyframesRef.current[i], controllerRef.current.signal);
+      if (statusRef.current !== "playing") break;
     }
 
-    setCurrentKeyframeIndex(nextIndex);
-    await playKeyframe(nextIndex);
-  }, [playKeyframe]);
+    // End of sequence or externally stopped
+    if (statusRef.current === "playing") {
+      setStatus("idle");
+      statusRef.current = "idle"
 
-  const previousKeyframe = useCallback(async () => {
-    if (!currentSequenceRef.current) return;
+      if (autoResetOnEnd) setIndex(0);
+      onEnd?.();
+    }
+    controllerRef.current = null;
+  }, [animateTo, abortInFlight, autoResetOnEnd, map, onEnd, onStart, total]);
 
-    const prevIndex = currentKeyframeIndexRef.current - 1;
-    if (prevIndex < 0) return;
+  const pause = useCallback(() => {
+    if (statusRef.current !== "playing") return;
+    pausedViewRef.current = getSnapshot();
+    abortInFlight();
+    setStatus("paused");
+    statusRef.current = "paused"
+  }, [abortInFlight, getSnapshot]);
 
-    setCurrentKeyframeIndex(prevIndex);
-    await playKeyframe(prevIndex);
-  }, [playKeyframe]);
+  const resume = useCallback(async () => {
 
-  const playSequence = useCallback(async () => {
-    if (!currentSequenceRef.current) return;
+    if (!map ) return;
 
-    console.log('🎬 Starting keyframe sequence...');
-    setIsPlaying(true);
-    setIsAutoPlaying(true);
-    isAutoPlayingRef.current = true;
-    sequenceStartTimeRef.current = performance.now();
-    
-    // Notify that sequence is starting (for TripsOverlay reset)
-    onSequenceStart?.();
+    // Restore the paused pose (in case the user dragged)
+    if (pausedViewRef.current) jumpTo(pausedViewRef.current);
 
-    // Play all keyframes in sequence
-    for (let i = 0; i < currentSequenceRef.current.keyframes.length; i++) {
-      if (!isAutoPlayingRef.current) {
-        console.log('🛑 Auto-play cancelled');
-        break; // Stop if auto-play was cancelled
-      }
-      
-      console.log(`🎯 Playing keyframe ${i + 1}/${currentSequenceRef.current.keyframes.length}`);
-      setCurrentKeyframeIndex(i);
-      await playKeyframe(i);
+    // If we landed exactly on a keyframe, advance to next
+    let start = indexRef.current;
+    const kf = keyframesRef.current[start];
+    const v = pausedViewRef.current;
+
+    const approxEqual = (a, b, epsCenter = 1e-5, epsOther = 1e-3) => {
+      if (!a || !b) return false;
+      const [lngA, latA] = a.center;
+      const [lngB, latB] = b.center;
+      return (
+        Math.abs(lngA - lngB) < epsCenter &&
+        Math.abs(latA - latB) < epsCenter &&
+        Math.abs((a.zoom ?? 0) - (b.zoom ?? 0)) < epsOther &&
+        Math.abs((a.bearing ?? 0) - (b.bearing ?? 0)) < 0.1 &&
+        Math.abs((a.pitch ?? 0) - (b.pitch ?? 0)) < 0.1
+      );
+    };
+
+    if (kf && v && approxEqual(kf, v)) start = Math.min(start + 1, total);
+
+    setStatus("playing");
+    statusRef.current = "playing"
+    controllerRef.current = new AbortController();
+
+    for (let i = start; i < total; i++) {
+      if (statusRef.current !== "playing") break;
+      setIndex(i);
+      await animateTo(keyframesRef.current[i], controllerRef.current.signal);
+      if (statusRef.current !== "playing") break;
     }
 
-    console.log('✅ Keyframe sequence complete');
-    setIsPlaying(false);
-    setIsAutoPlaying(false);
-    isAutoPlayingRef.current = false;
-  }, [playKeyframe, onSequenceStart]);
-
-  const stopAnimation = useCallback(() => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
+    if (statusRef.current === "playing") {
+      setStatus("idle");
+      statusRef.current = "idle"
+      if (autoResetOnEnd) setIndex(0);
+      onEnd?.();
     }
-    setIsPlaying(false);
-    setIsAutoPlaying(false);
-    isAutoPlayingRef.current = false;
-  }, []);
+    controllerRef.current = null;
+  }, [animateTo, autoResetOnEnd, jumpTo, map, onEnd, total]);
 
-  const resetToFirstKeyframe = useCallback(() => {
-    if (!currentSequenceRef.current || !map) return;
-    
-    stopAnimation();
-    setCurrentKeyframeIndex(0);
-    
-    const firstKeyframe = currentSequenceRef.current.keyframes[0];
-    map.setCenter(firstKeyframe.center);
-    map.setZoom(firstKeyframe.zoom);
-    map.setBearing(firstKeyframe.bearing ?? 0);
-    map.setPitch(firstKeyframe.pitch ?? 0);
-    
-    // Ensure all states are properly reset
-    setIsPlaying(false);
-    setIsAutoPlaying(false);
-    isAutoPlayingRef.current = false;
-  }, [map, stopAnimation]);
 
-  // Initialize with first sequence
+  const stop = useCallback(() => {
+    abortInFlight();
+    setStatus("idle");
+    statusRef.current = "idle"
+  }, [abortInFlight]);
+
+  const reset = useCallback(() => {
+    abortInFlight();
+    setStatus("idle");
+    statusRef.current = "idle"
+    setIndex(0);
+    if (keyframesRef.current[0]) jumpTo(keyframesRef.current[0]);
+    pausedViewRef.current = null;
+  }, [abortInFlight, jumpTo]);
+
+  const next = useCallback(() => {
+    if (total === 0) return;
+    abortInFlight();
+    const nextIdx = Math.min(indexRef.current + 1, total - 1);
+    setIndex(nextIdx);
+    jumpTo(keyframesRef.current[nextIdx]);
+    setStatus("idle"); // allow Play to continue from here
+    statusRef.current = "idle"
+    pausedViewRef.current = keyframesRef.current[nextIdx];
+  }, [abortInFlight, jumpTo, total]);
+
+  const previous = useCallback(() => {
+    if (total === 0) return;
+    abortInFlight();
+    const prevIdx = Math.max(indexRef.current - 1, 0);
+    setIndex(prevIdx);
+    jumpTo(keyframesRef.current[prevIdx]);
+    setStatus("idle");
+    statusRef.current = "idle"
+    pausedViewRef.current = keyframesRef.current[prevIdx];
+  }, [abortInFlight, jumpTo, total]);
+
+  const jumpToIndex = useCallback((i) => {
+    if (i < 0 || i >= total) return;
+    abortInFlight();
+    setIndex(i);
+    jumpTo(keyframesRef.current[i]);
+    setStatus("idle");
+    statusRef.current = "idle"
+  }, [abortInFlight, jumpTo, total]);
+
+  // --- Autostart once map is ready
   useEffect(() => {
-    if (sequences.length > 0 && !currentSequence) {
-      setCurrentSequence(sequences[0]);
-    }
-  }, [currentSequence, sequences]);
-
-  // 🔥 Autoplay when the map is ready and a sequence exists
-  useEffect(() => {
-    if (!autoStart || autoplayStartedRef.current) return;
-    if (!map || !currentSequence) return;
+    console.log("TTT", autoStartedRef.current, map, total)
+    if (!autoStart || autoStartedRef.current || !map || total === 0) return;
 
     const start = () => {
-      if (autoplayStartedRef.current) return;
-      autoplayStartedRef.current = true;
-
-      setCurrentKeyframeIndex(0);
-
-      // Kick off the sequence
-      playSequence();
+      if (autoStartedRef.current) return;
+      autoStartedRef.current = true;
+      setIndex(0);
+      setStatus("playing");
+      statusRef.current = "playing"
+      play();
     };
 
-    // Start immediately if map is already loaded, otherwise wait once
-    const isLoaded = typeof map.loaded === 'function' ? map.loaded() : true;
-    if (isLoaded) {
-      start();
-    } else {
-      map.once('load', start);
-    }
-    
-    // Cleanup on unmount if effect reruns/unmounts
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [autoStart, map, currentSequence, playSequence]);
+    const loaded = typeof map.loaded === "function" ? map.loaded() : true;
+    if (loaded) start();
+    else map.once("load", start);
+
+    // cleanup: if unmounting mid-animation, abort
+    return () => abortInFlight();
+  }, [abortInFlight, autoStart, map, total]);
 
   return {
-    sequences,
-    currentSequence,
-    currentKeyframeIndex,
+    // state
+    status,
     isPlaying,
-    isAutoPlaying,
-    totalKeyframes: currentSequence?.keyframes.length ?? 0,
-    nextKeyframe,
-    previousKeyframe,
-    playSequence,
-    stopAnimation,
-    resetToFirstKeyframe,
-    setCurrentSequence,
+    isPaused,
+    index,
+    total,
+
+    // controls
+    play,
+    pause,
+    resume,
+    stop,
+    reset,
+    next,
+    previous,
+    jumpTo: jumpToIndex,
+
+    // config
+    setKeyframes,
   };
 }

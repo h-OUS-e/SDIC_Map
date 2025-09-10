@@ -3,6 +3,7 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import type maplibregl from "maplibre-gl";
 import React, { useEffect, useMemo, useRef } from "react";
 import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
+import { COLOR_MODES } from './RouteLayer';
 
 export type TripDatum = {
   path: [number, number][];
@@ -41,7 +42,7 @@ function getMaxTimestamp(arr: TripDatum[]): number {
   return maxT;
 }
 
-export default function TripsOverlay({
+export default function TripsOverlaySeries({
   map,
   geoJSON,
   trail = 900,
@@ -171,6 +172,18 @@ export default function TripsOverlay({
     };
   }, [map]);
 
+  const PALETTE: [number, number, number][] = [
+  [166, 206, 0],
+  [31, 120, 180],
+  [178, 223, 138],
+  [51, 160, 44],
+  [251, 154, 153],
+  [227, 26, 28],
+  [253, 191, 111],
+  [255, 127, 0],
+  [202, 178, 214],
+  [106, 61, 154],
+];
   // Build a layer factory that we can call every frame with a new currentTime
   const makeLayers = (nowS: number) => [
     new TripsLayer<TripDatum>({
@@ -181,7 +194,7 @@ export default function TripsOverlay({
       trailLength: trail,
       getPath: (d) => d.path,
       getTimestamps: (d) => d.timestamps,
-      getColor: () => [168, 203, 255],
+      getColor: (d, {index}) =>{console.log("TEST", d.color, d); return d.color ?? [5,5,5]},
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,
@@ -189,6 +202,7 @@ export default function TripsOverlay({
       jointRounded: true,
     }),
   ];
+
 
   // Start/drive the animation loop whenever inputs change
   useEffect(() => {

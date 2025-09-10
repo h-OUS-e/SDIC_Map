@@ -11,10 +11,50 @@ import MapHoverOverlay from "./MapHoverOverlay";
 import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
-import { useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
+import { easingFunctions, useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
 import KeyframeControls from './KeyframeControls';
 
 const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
+const isAutoStart = true;
+
+
+// Build your keyframes (same views you had, just as a list):
+const initialView = {
+  center: [-122.43609, 37.77169],
+  zoom: 11,
+  bearing: 0,
+  pitch: 0,
+  duration: 200,
+  easing: easingFunctions.easeInOut,
+};
+const sfView1 = {
+  center: [-122.40451, 37.79837],
+  zoom: 14.5,
+  bearing: 0,
+  pitch: 0,
+  duration: 8000,
+  easing: easingFunctions.easeInOut,
+};
+const sfView2 = {
+  center: [-122.40451, 37.79837],
+  zoom: 14,
+  bearing: 60,
+  pitch: 25,
+  duration: 8000,
+  easing: easingFunctions.easeInOut,
+};
+const bayAreaView = {
+  center: [-122.27463, 37.61096],
+  zoom: 10.25,
+  bearing: 0,
+  pitch: 0,
+  duration: 8000,
+  easing: easingFunctions.easeInOut,
+};
+
+
+
+const keyframes = [initialView, sfView1, sfView2, bayAreaView];
 
 
 function getBasePath() {
@@ -59,18 +99,17 @@ export default function Map() {
         }
     };
 
+
+    // Inside a component:
     const {
-        currentSequence,
-        currentKeyframeIndex,
-        isPlaying,
-        isAutoPlaying,
-        totalKeyframes,
-        nextKeyframe,
-        previousKeyframe,
-        playSequence,
-        stopAnimation,
-        resetToFirstKeyframe,
-    } = useKeyframeAnimation(map.current, handleSequenceStart, { autoStart: true });
+        status, isPlaying, isPaused, index: currentKeyframeIndex, total,
+        play, pause, resume, stop, reset, next, previous, jumpTo
+        } = useKeyframeAnimation(map.current, keyframes, {
+        autoStart: isAutoStart,         // start automatically once map loads
+        autoResetOnEnd: false,   // set to true if you want index to return to 0 when finished
+        onStart: () => {/* optional */},
+        onEnd: () => {/* optional */},
+    });
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -106,7 +145,8 @@ export default function Map() {
 
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
+            // style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
+            style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
             center: initialState.center,
             zoom: initialState.zoom,
         });
@@ -191,14 +231,15 @@ export default function Map() {
             {isMapLoaded && (
                 <KeyframeControls
                     currentKeyframeIndex={currentKeyframeIndex}
-                    totalKeyframes={totalKeyframes}
-                    isPlaying={isPlaying}
-                    isAutoPlaying={isAutoPlaying}
-                    onNext={nextKeyframe}
-                    onPrevious={previousKeyframe}
-                    onPlaySequence={playSequence}
-                    onStop={stopAnimation}
-                    onReset={resetToFirstKeyframe}
+                    totalKeyframes={keyframes.length}
+                    isPlaying={status==="playing"}
+                    isPaused={status==="paused"}
+                    isAutoPlaying={isAutoStart}
+                    onNext={next}
+                    onPrevious={previous}
+                    onResume={resume}
+                    onStop={pause}
+                    onReset={reset}
                     onToggleView={toggleView}
                     isZoomedOut={isZoomedOut}
                     onToggleSmoothed={toggleSmoothed}

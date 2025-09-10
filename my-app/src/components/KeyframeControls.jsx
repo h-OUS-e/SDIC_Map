@@ -7,10 +7,12 @@ export default function KeyframeControls({
   currentKeyframeIndex,
   totalKeyframes,
   isPlaying,
+  isPaused,
   isAutoPlaying,
   onNext,
   onPrevious,
   onPlaySequence,
+  onResume,
   onStop,
   onReset,
   isZoomedOut = false,
@@ -260,7 +262,7 @@ export default function KeyframeControls({
           ←<span style={srOnly}>Previous</span>
         </button>
 
-        {isAutoPlaying ? (
+        {isPlaying ? (
           <button
             onClick={onStop}
             title="Stop"
@@ -271,8 +273,7 @@ export default function KeyframeControls({
           </button>
         ) : (
           <button
-            onClick={onPlaySequence}
-            disabled={isPlaying}
+            onClick={onResume}
             title="Play"
             aria-label="Play sequence"
             style={

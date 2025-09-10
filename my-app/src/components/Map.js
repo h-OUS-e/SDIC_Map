@@ -15,6 +15,7 @@ import { useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
 import KeyframeControls from './KeyframeControls';
 
 const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
+const MAPTILER_2 = "pWuuKuOsL6jBB1Gt1ClK";
 
 
 function getBasePath() {
@@ -29,6 +30,7 @@ export default function Map() {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const [API_KEY] = useState(MAPTILER_API_KEY);
+    const [API_KEY2] = useState(MAPTILER_2);
     const [visualizationMode, setVisualizationMode] = useState("offset"); 
     const layerId = "saved-route-line";
 
@@ -104,7 +106,8 @@ export default function Map() {
         map.current = new maplibregl.Map({
             container: mapContainer.current,
             style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
-            center: initialState.center,
+            // style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-            b59a-96734dcc38bf/?key=${API_KEY2}`,
+            // style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/?key=${API_KEY2}`,
             zoom: initialState.zoom,
         });
 

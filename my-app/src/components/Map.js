@@ -3,7 +3,7 @@
 import maplibregl from 'maplibre-gl';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteGenerator from './RouteGenerator';
-import RouteLayer from './RouteLayer';
+import RouteLayer, { COLOR_MODES } from './RouteLayer';
 
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
@@ -42,6 +42,8 @@ export default function Map() {
 
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+    const [colorMode, setColorMode] = useState(COLOR_MODES.NONE);
 
     // route data
     const [geoJSON, setGeoJSON] = useState([]);
@@ -92,6 +94,7 @@ export default function Map() {
         center: [-122.43609, 37.77169], // A central point to see SF, Berkeley, and Palo Alto
         zoom: 11,
     };
+
 
 
     // Initialize map
@@ -201,6 +204,7 @@ export default function Map() {
                     onToggleSmoothed={toggleSmoothed}
                     showSmoothed={showSmoothed}
                     viewInfo={viewInfo}
+                    setColorMode={setColorMode}
                 />
             )}
 
@@ -209,7 +213,8 @@ export default function Map() {
             {isMapLoaded && (
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
-                    <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed} />
+                    
+                    <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed}  colorMode={colorMode}/>
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
                         <TripsOverlay

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { COLOR_MODES } from './RouteLayer';
 
 export default function KeyframeControls({
   currentKeyframeIndex,
@@ -17,6 +18,9 @@ export default function KeyframeControls({
   showSmoothed = true,
   onToggleSmoothed = () => {},
   viewInfo = null,
+  setColorMode = () => {},
+  colorMode = COLOR_MODES.NONE, 
+
 }) {
 
   const [isHidden, setIsHidden] = React.useState(true);
@@ -311,7 +315,6 @@ export default function KeyframeControls({
 
 
 
-      {/* Map View & Layers (moved buttons) */}
       <div
         style={{
           marginTop: 12,
@@ -345,9 +348,66 @@ export default function KeyframeControls({
           >
             {showSmoothed ? "Show Original" : "Show Smooth"}
           </button>
-        </div>
-        
+        </div>     
       </div>
+        
+        {/* NEW: Color Mode toggle buttons */}
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: "1px solid rgba(255,255,255,0.12)",
+        }}
+      >
+        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>
+          Color Mode
+        </div>
+
+        <div
+          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+          role="group"
+          aria-label="Color mode selection"
+        >
+          <button
+            onClick={() => setColorMode(COLOR_MODES.NONE)}
+            aria-pressed={colorMode === COLOR_MODES.NONE}
+            title="No color coding"
+            style={
+              colorMode === COLOR_MODES.NONE
+                ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
+                : withHover(pillBtn, iconBtnHover)
+            }
+          >
+            None
+          </button>
+
+          <button
+            onClick={() => setColorMode(COLOR_MODES.TEAM)}
+            aria-pressed={colorMode === COLOR_MODES.TEAM}
+            title="Color by team"
+            style={
+              colorMode === COLOR_MODES.TEAM
+                ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
+                : withHover(pillBtn, iconBtnHover)
+            }
+          >
+            Team
+          </button>
+            <button
+            onClick={() => setColorMode(COLOR_MODES.MONTH)}
+            aria-pressed={colorMode === COLOR_MODES.MONTH}
+            title="Color by month"
+            style={
+              colorMode === COLOR_MODES.MONTH
+                ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
+                : withHover(pillBtn, iconBtnHover)
+            }
+          >
+            Month
+          </button>
+        </div>
+      </div>
+      
       
 
       <div style={divider} />

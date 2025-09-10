@@ -47,7 +47,7 @@ export default function TripsOverlay({
   trail = 900,
   lineWidth = 4,
   fps = 30,
-  opacity = 0.6,
+  opacity = 0.1,
   loopDelay = 5, 
   loop = true,
   timeSpeedProfile = null,

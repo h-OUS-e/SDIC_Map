@@ -26,11 +26,57 @@ const END_COLOR = "#c0effc"; // 8b60f7
 const head_t = 100;
 const tail_t = 100;
 const inner_head_t = 1500;
-const inner_tail_t = 1500;
+const inner_tail_t = 5500;
 
 const showVertices = false;
 const showGradientVertices = false;
 
+export const COLOR_MODES = { NONE: "none", TEAM: "team", MONTH: "month" };
+
+const MONTH_PALETTE = {
+  January:"#2563eb", February:"#ef4444", March:"#10b981", April:"#f59e0b",
+  May:"#8b5cf6", June:"#06b6d4", July:"#f43f5e", August:"#22c55e",
+  September:"#a855f7", October:"#eab308", November:"#3b82f6", December:"#d946ef"
+};
+
+const TEAM_PALETTE = {
+  "Ambient/MX Devices": "#06b6d4",
+  // ...add known teams here if you want specific colors
+};
+
+const stringToColor = (s) => {
+  let h = 0; for (let i = 0; i < String(s).length; i++) h = (h*31 + s.charCodeAt(i)) % 360;
+  return `hsl(${h}, 70%, 50%)`; // Mapbox accepts CSS colors
+};
+
+// Build a Mapbox expression like: ["match", ["get", prop], "Team A", "#...", "Team B", "#...", END_COLOR]
+function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETTE, monthPalette = MONTH_PALETTE) {
+  if (mode === COLOR_MODES.NONE) return fallbackColor;
+
+  const prop = mode === COLOR_MODES.TEAM ? "team" : "month";
+  const domain = Array.from(new Set(features.map(f => f?.properties?.[prop]).filter(Boolean)));
+
+  const pairs = [];
+  domain.forEach(v => {
+    let c = fallbackColor;
+    if (mode === COLOR_MODES.TEAM) c = teamPalette[v] || stringToColor(v);
+    else                           c = monthPalette[v] || stringToColor(v);
+    pairs.push(v, c);
+  });
+
+  // If property missing or not in domain, fall back to END_COLOR
+  return ["match", ["get", prop], ...pairs, fallbackColor];
+}
+
+
+const getFeatureColor = (props, colorBy, fallback) => {
+  if (colorBy === COLOR_MODES.NONE) return fallback;
+  const key = colorBy === COLOR_MODES.TEAM ? props?.team : props?.month;
+  if (!key) return fallback;
+  return colorBy === COLOR_MODES.TEAM
+    ? (TEAM_PALETTE[key] || stringToColor(key))
+    : (MONTH_PALETTE[key] || stringToColor(key));
+};
 
 
 // --- CSV helpers ---
@@ -320,12 +366,16 @@ export default function RouteLayer({
     fitOnLoad = false,
     routeImportance = "medium",
     showSmoothed = false,
+    colorMode = COLOR_MODES.NONE 
 }) {
 
     // React state holding the loaded route GeoJSON (Feature/FeatureCollection).
     // const [geojson, setGeojson] = useState(null)
     const lastSentRef = useRef(null)
     const featureLayerIdsRef = useRef([]);
+
+    // State to color end points based on different color modes
+    const [colorBy, setColorBy] = useState(COLOR_MODES.NONE);
 
     // CSV State
     const [csvRows, setCsvRows] = useState([]);
@@ -452,7 +502,6 @@ export default function RouteLayer({
     useEffect(() => {
         if (!map || !fcIndexed) return;
 
-        // Clean up any previously created per-feature layers
         // clear previously created layers
         featureLayerIdsRef.current.forEach(id => map.getLayer(id) && map.removeLayer(id));
         featureLayerIdsRef.current = [];
@@ -467,7 +516,35 @@ export default function RouteLayer({
                 minGapT: 1e-3,
             });
 
+            // prefer original props if present (indexed can lose metadata)
+            const origProps = originalFC?.features?.[i]?.properties || {};
+            const idxProps  = fcIndexed?.features?.[i]?.properties || {};
+            const props     = Object.keys(origProps).length ? origProps : idxProps;
+
+            // pick base color per feature according to color mode
+            const BASE = getFeatureColor(props, colorBy, END_COLOR);
+
             const id = `${layerId}-${i}`;
+            const outlineId = `${layerId}-${i}-outline`;  // optional outline (under)
+
+
+            /// OPTIONAL REMOVE FOR ONLY SEEING END POINT COLOR
+            // map.addLayer({
+            //     id: outlineId,
+            //     type: "line",
+            //     source: sourceId,
+            //     layout: { "line-cap": "round", "line-join": "round" },
+            //     paint: {
+            //         "line-color": BASE,              // <- data-driven base color
+            //         "line-width": CRAYON_WIDTH/3,      // wider than main to peek out
+            //         "line-opacity": .4,
+            //         "line-blur": 0.5,
+            //     },
+            //     filter: ["==", ["id"], i],
+            //     });
+            // featureLayerIdsRef.current.push(outlineId);
+
+                    
 
             // Build a gradient that uses only LITERAL stop positions
             const lineGradient = [
@@ -477,8 +554,8 @@ export default function RouteLayer({
                 t2,  MID_COLOR,
                 t3,  MID_COLOR,
                 t4,  MID_COLOR,
-                t5,  END_COLOR,
-                1,   END_COLOR,
+                t5,  BASE,
+                1,   BASE,
             ] ;
 
             // Add the layer, filtered to just this feature.id
@@ -506,7 +583,7 @@ export default function RouteLayer({
             featureLayerIdsRef.current.forEach(id => map.getLayer(id) && map.removeLayer(id));
             featureLayerIdsRef.current = [];
         };
-    }, [map, fc, fcIndexed, sourceId, layerId, opacity, routeImportance]);
+    }, [map, fc, fcIndexed, sourceId, layerId, opacity, routeImportance, colorBy]);
 
 
     // 3a) Origin & endpoint points
@@ -584,6 +661,12 @@ export default function RouteLayer({
                 }),
             };
             upsertGeoJSONSource(map, endSrc, endpointFC);
+
+            // Build the color expression once from the features
+            const endpointColor = buildColorExpr(endpointFC.features, colorBy, END_COLOR);
+
+            // Optional: a small, sharp "core" circle to show the categorical color clearly
+
             const baseZoomRadius = (k) => [
                 "interpolate", ["linear"], ["zoom"],
                 10,  8 * k,
@@ -593,12 +676,21 @@ export default function RouteLayer({
             const ks = [.5, .22, .35, .27];
             ks.forEach((k, i) => {
                 ensurePointLayer(map, `${layerId}-endpoint-glow${i+1}`, endSrc, {
-                    "circle-color": END_COLOR,
+                    "circle-color": endpointColor,
                     "circle-radius": baseZoomRadius(k),   // <-- stays top-level interpolate
                     "circle-opacity": i === ks.length - 1 ? 0.3 : 0.1,
                     "circle-blur": i === ks.length - 1 ? 0.5 : 0.3,
                 });
             });
+            const coreId = `${layerId}-endpoint-core`;
+                ensurePointLayer(map, coreId, endSrc, {
+                "circle-color": END_COLOR,
+                "circle-radius": baseZoomRadius(.09),
+                "circle-stroke-width": 1.2,
+                "circle-stroke-color": END_COLOR,
+                "circle-opacity": .2,
+            });
+
 
             // Invisible hit points to hover over for popups
             const endHitId = `${layerId}-endpoint-hit`;
@@ -632,12 +724,13 @@ export default function RouteLayer({
                 `${layerId}-endpoint-glow5`,
                 `${layerId}-endpoint-glow6`,
                 `${layerId}-endpoint-hit`,
+                `${layerId}-endpoint-core`
             ];
             ids.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) });
             if (map.getSource(pointSrc)) map.removeSource(pointSrc);
             if (map.getSource(endSrc))   map.removeSource(endSrc);
         };
-    }, [map, fcIndexed, origin, endpoints, sourceId, layerId, csvIndex]);
+    }, [map, fcIndexed, origin, endpoints, sourceId, layerId, csvIndex, colorBy]);
 
 
     // 3b) Show vertices as points (FOR DEBUGGING)
@@ -774,6 +867,10 @@ export default function RouteLayer({
     }, [map, fc, fitOnLoad]);
 
 
+    // Update color of routes and endpoints if colorMode changes
+    useEffect(() => {
+        setColorBy(colorMode)
+    }, [colorMode])
     
     // Local file loader
     const onFile = async (e) => {

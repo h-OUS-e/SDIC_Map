@@ -2,7 +2,6 @@
 
 import maplibregl from 'maplibre-gl';
 import React, { useEffect, useRef, useState } from 'react';
-import RouteGenerator from './RouteGenerator';
 import RouteLayer, { COLOR_MODES } from './RouteLayer';
 
 // [TRIPS ADD]

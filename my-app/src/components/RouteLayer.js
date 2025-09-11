@@ -82,6 +82,13 @@ const getFeatureColor = (props, colorBy, fallback) => {
 // --- CSV helpers ---
 const normalize = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 
+function getBasePath() {
+    if (typeof window === 'undefined') return '';
+    const parts = window.location.pathname.split('/').filter(Boolean);
+    // On GH Pages: /<repo>/...  -> use the first segment
+    return parts.length ? `/${parts[0]}` : '';
+}
+
 function parseSemicolonCSV(text) {
     const lines = text.split(/\r?\n/).filter(Boolean);
     if (!lines.length) return [];
@@ -401,6 +408,37 @@ export default function RouteLayer({
             alert("Invalid CSV file");
         }
     };
+
+    // Auto-load CSV data from assets folder
+    useEffect(() => {
+        const loadCsvData = async () => {
+            try {
+                // Try to load the edited CSV first, fallback to regular CSV
+                const csvUrl = `${getBasePath()}/assets/address_list_edited.csv`;
+                const response = await fetch(csvUrl);
+                if (response.ok) {
+                    const text = await response.text();
+                    const parsed = parseSemicolonCSV(text);
+                    setCsvRows(parsed);
+                    console.log(`Loaded ${parsed.length} CSV rows from assets`);
+                } else {
+                    // Fallback to regular CSV
+                    const fallbackUrl = `${getBasePath()}/assets/address_list.csv`;
+                    const fallbackResponse = await fetch(fallbackUrl);
+                    if (fallbackResponse.ok) {
+                        const text = await fallbackResponse.text();
+                        const parsed = parseSemicolonCSV(text);
+                        setCsvRows(parsed);
+                        console.log(`Loaded ${parsed.length} CSV rows from fallback CSV`);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not auto-load CSV data:", err);
+            }
+        };
+
+        loadCsvData();
+    }, []);
 
     const { data: smoothed, original: original} = useSmoothRoute({
         url,

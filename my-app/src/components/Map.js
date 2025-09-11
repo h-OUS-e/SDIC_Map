@@ -8,6 +8,7 @@ import RouteLayer, { COLOR_MODES } from './RouteLayer';
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
+import EnhancedEndpointOverlay from "./EnhancedEndpointOverlay";
 import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
@@ -280,9 +281,9 @@ export default function Map() {
                     {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
 
                     
-                    {/* Hover overlay — point it at your endpoint hit layer (or glow layers) */}
+                    {/* Enhanced endpoint hover overlay */}
                     {map.current && (
-                        <MapHoverOverlay
+                        <EnhancedEndpointOverlay
                             map={map.current}
                             layers={[`${layerId}-endpoint-hit`]}
                             offset={{ x: 14, y: 14 }}

@@ -8,7 +8,7 @@ import RouteLayer, { COLOR_MODES } from './RouteLayer';
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
-import EnhancedEndpointOverlay from "./EnhancedEndpointOverlay";
+import MapLocationLabels from "./MapLocationLabels";
 import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
@@ -281,14 +281,24 @@ export default function Map() {
                     {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
 
                     
-                    {/* Enhanced endpoint hover overlay */}
+                    {/* Hover overlay — point it at your endpoint hit layer (or glow layers) */}
                     {map.current && (
-                        <EnhancedEndpointOverlay
+                        <MapHoverOverlay
                             map={map.current}
                             layers={[`${layerId}-endpoint-hit`]}
                             offset={{ x: 14, y: 14 }}
                         />
-                    )};
+                    )}
+
+                    {/* Location labels — show location names at zoom 14-15 */}
+                    {map.current && (
+                        <MapLocationLabels
+                            map={map.current}
+                            layers={[`${layerId}-endpoint-hit`]}
+                            minZoom={14}
+                            maxZoom={15}
+                        />
+                    )}
                 </>                 
             )}
         </div>

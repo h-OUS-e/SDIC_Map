@@ -22,7 +22,7 @@ const CRAYON_WIDTH = 8
 const CRAYON_OPACITY = .2
 const START_COLOR = "#a8cbff";
 const MID_COLOR = SDIC_BLUE;
-const END_COLOR = "#c0effc"; // 8b60f7
+export const END_COLOR = "#c0effc"; // 8b60f7
 const head_t = 100;
 const tail_t = 100;
 const inner_head_t = 1500;
@@ -44,10 +44,26 @@ export const TEAM_PALETTE = {
   // ...add known teams here if you want specific colors
 };
 
-const stringToColor = (s) => {
+export const stringToColor = (s) => {
   let h = 0; for (let i = 0; i < String(s).length; i++) h = (h*31 + s.charCodeAt(i)) % 360;
   return `hsl(${h}, 70%, 50%)`; // Mapbox accepts CSS colors
 };
+
+// Convert a hex color like "#3D64F6" into [r, g, b ]
+export function hexToRGB(hex) {
+  const clean = hex.replace(/^#/, "");
+  const full = clean.length === 3
+    ? clean.split("").map(c => c + c).join("")
+    : clean;
+
+  const bigint = parseInt(full, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+
+  return [r, g, b, 255];
+}
+
 
 // Build a Mapbox expression like: ["match", ["get", prop], "Team A", "#...", "Team B", "#...", END_COLOR]
 function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETTE, monthPalette = MONTH_PALETTE) {
@@ -69,7 +85,7 @@ function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETT
 }
 
 
-const getFeatureColor = (props, colorBy, fallback) => {
+export const getFeatureColor = (props, colorBy, fallback) => {
   if (colorBy === COLOR_MODES.NONE) return fallback;
   const key = colorBy === COLOR_MODES.TEAM ? props?.team : props?.month;
   if (!key) return fallback;
@@ -435,7 +451,6 @@ export default function RouteLayer({
 
     const smoothedFC = useMemo(() => (smoothed ? asFC(smoothed) : null), [smoothed])
     const originalFC = useMemo(() => (original ? asFC(original) : null), [original])
-
     const fc = showSmoothed ? smoothedFC : originalFC
 
     // 0) Get lines decorated with t1,t2,t3 stops for gradient rendering
@@ -452,26 +467,51 @@ export default function RouteLayer({
         };
     }, [fc]);
 
+    // Adding color to each route based on color mode
+    const fcIndexedWithBase = useMemo(() => {
+        if (!fcIndexed) return null;
+
+        return {
+            type: "FeatureCollection",
+            features: (fcIndexed.features || []).map((feat, i) => {
+            // prefer original props if present (smoothed can lose metadata)
+            const origProps = originalFC?.features?.[i]?.properties || {};
+            const idxProps  = feat?.properties || {};
+            const props     = Object.keys(origProps).length ? origProps : idxProps;
+
+            const HEX = getFeatureColor(props, colorBy, END_COLOR);
+            const color = hexToRGB(HEX)
+
+            // keep a stable id and copy through properties; inject __base for downstream use
+            return {
+                ...feat,
+                id: i,
+                properties: { ...props, __idx: i, __base: HEX, color: color },
+            };
+            }),
+        };
+    }, [fcIndexed, originalFC, colorBy]);
+
     useEffect(() => {
-        if (!smoothedFC || !onData) return;
+        if (!fcIndexedWithBase || !onData) return;
 
-        // Optional: ensure there’s at least one feature before sending
-        const hasFeatures =
-            Array.isArray(smoothedFC.features) && smoothedFC.features.length > 0;
-
+        // Ensure there’s at least one feature before sending
+        const hasFeatures = Array.isArray(fcIndexedWithBase.features) && fcIndexedWithBase.features.length > 0;
         if (!hasFeatures) return;
 
         // Avoid duplicate sends for the same object reference
-        if (lastSentRef.current !== smoothedFC) {
-            lastSentRef.current = smoothedFC;
+        if (lastSentRef.current !== fcIndexedWithBase) {
+            lastSentRef.current = fcIndexedWithBase;
+            console.log("TTTTEST", fcIndexedWithBase.features)
             try {
-                onData(smoothedFC); // sends the displayed collection (smoothed or original) to the parent
+                onData(fcIndexedWithBase); // sends the displayed collection (smoothed or original) to the parent
                 // console.debug("[RouteLayer] onData sent FC with", fc.features.length, "features");
             } catch (err) {
                 console.error("[RouteLayer] onData failed:", err);
             }
         }
-    }, [smoothedFC, onData]);
+    }, [fcIndexedWithBase, onData]);
+
 
     const { origin, endpoints } = useMemo(() => {
         if (!fcIndexed) return { origin: null, endpoints: [] };
@@ -493,9 +533,9 @@ export default function RouteLayer({
     
     // 1) Source (route geojson)
     useEffect(() => {
-        if (!map || !fcIndexed) return;
-        upsertGeoJSONSource(map, sourceId, fcIndexed, true); // lineMetrics for gradient
-    }, [map, fcIndexed, sourceId]);
+        if (!map || !fcIndexedWithBase) return;
+        upsertGeoJSONSource(map, sourceId, fcIndexedWithBase, true); // lineMetrics for gradient
+    }, [map, fcIndexedWithBase, sourceId]);
 
     
     // 2) Line layers (main + outline)
@@ -516,17 +556,12 @@ export default function RouteLayer({
                 minGapT: 1e-3,
             });
 
-            // prefer original props if present (indexed can lose metadata)
-            const origProps = originalFC?.features?.[i]?.properties || {};
-            const idxProps  = fcIndexed?.features?.[i]?.properties || {};
-            const props     = Object.keys(origProps).length ? origProps : idxProps;
-            console.log("TEST 2", props)
-
-            // pick base color per feature according to color mode
-            const BASE = getFeatureColor(props, colorBy, END_COLOR);
+            // grab the precomputed base color
+            const BASE = feat?.properties?.__base ?? END_COLOR;
 
             const id = `${layerId}-${i}`;
-            const outlineId = `${layerId}-${i}-outline`;  // optional outline (under)
+
+            // const outlineId = `${layerId}-${i}-outline`;  // optional outline (under)
 
 
             /// OPTIONAL REMOVE FOR ONLY SEEING END POINT COLOR
@@ -558,6 +593,7 @@ export default function RouteLayer({
                 t5,  BASE,
                 1,   BASE,
             ] ;
+            
 
             // Add the layer, filtered to just this feature.id
             map.addLayer({
@@ -584,7 +620,7 @@ export default function RouteLayer({
             featureLayerIdsRef.current.forEach(id => map.getLayer(id) && map.removeLayer(id));
             featureLayerIdsRef.current = [];
         };
-    }, [map, fc, fcIndexed, sourceId, layerId, opacity, routeImportance, colorBy]);
+    }, [map, fcIndexedWithBase, sourceId, layerId, opacity, routeImportance]);
 
 
     // 3a) Origin & endpoint points

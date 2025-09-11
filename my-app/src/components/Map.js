@@ -43,6 +43,14 @@ const sfView2 = {
   duration: 8000,
   easing: easingFunctions.easeInOut,
 };
+const sfView3 = {
+  center: [-122.40451, 37.79837],
+  zoom: 13.5,
+  bearing: 60,
+  pitch: 25,
+  duration: 5000,
+  easing: easingFunctions.easeInOut,
+};
 const bayAreaView = {
   center: [-122.27463, 37.61096],
   zoom: 10.25,
@@ -52,9 +60,12 @@ const bayAreaView = {
   easing: easingFunctions.easeInOut,
 };
 
+const lastView = {
+  ...bayAreaView,
+  duration: 5000, // overrides the original duration
+};
 
-
-const keyframes = [initialView, sfView1, sfView2, bayAreaView];
+const keyframes = [initialView, sfView1, sfView2, sfView3, bayAreaView, lastView];
 
 
 function getBasePath() {
@@ -83,7 +94,7 @@ export default function Map() {
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-    const [colorMode, setColorMode] = useState(COLOR_MODES.NONE);
+    const [colorMode, setColorMode] = useState(COLOR_MODES.MONTH);
 
     // route data
     const [geoJSON, setGeoJSON] = useState([]);
@@ -261,23 +272,40 @@ export default function Map() {
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed}  colorMode={colorMode}/>
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
-                        <TripsOverlaySeries
-                            // ref={tripsOverlayRef}
-                            map={map.current}
-                            geoJSON={geoJSON}
-                            fps={30}
-                            trail={900}
-                            opacity={.3}
-                            lineWidth={1.5}
-                            // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                            timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
-                            playState={status}
-                            reset={resetTripsOverlay}
-                            onReset = {() =>{setResetTripsOverlay(false)}}
-                        />
-                    )}
+                        <>
+                            <TripsOverlaySeries
+                                // ref={tripsOverlayRef}
+                                map={map.current}
+                                geoJSON={geoJSON}
+                                fps={30}
+                                trail={900}
+                                opacity={.3}
+                                lineWidth={1.5}
+                                // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
+                                playState={status}
+                                reset={resetTripsOverlay}
+                                onReset = {() =>{setResetTripsOverlay(false)}}
+                                colorMode = {"none"}
+                            />
 
-                    {/* <RouteGenerator map={map.current} apiKey={API_KEY} /> */}
+                            <TripsOverlaySeries
+                                // ref={tripsOverlayRef}
+                                map={map.current}
+                                geoJSON={geoJSON}
+                                fps={30}
+                                trail={2}
+                                opacity={.6}
+                                lineWidth={1.5}
+                                // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                timeSpeedProfile={{ speeds: [0, 0, 20000, 100], dts: [16.2, 7, .1] }}
+                                playState={status}
+                                reset={resetTripsOverlay}
+                                onReset = {() =>{setResetTripsOverlay(false)}}
+                                colorMode = {"months"}
+                            />
+                        </>
+                    )}
 
                     
                     {/* Hover overlay — point it at your endpoint hit layer (or glow layers) */}

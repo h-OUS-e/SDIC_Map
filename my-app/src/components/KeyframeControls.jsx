@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { COLOR_MODES } from './RouteLayer';
+import React, { useState } from "react";
+import { COLOR_MODES } from "./RouteLayer";
 
 export default function KeyframeControls({
   currentKeyframeIndex,
@@ -26,7 +26,7 @@ export default function KeyframeControls({
 }) {
 
   const [isHidden, setIsHidden] = React.useState(true);
-
+  const [localColorMode, setLocalColorMode] = useState(colorMode);
 
   // Frosted glass panel
   const panelStyle = {
@@ -182,6 +182,9 @@ export default function KeyframeControls({
       "0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px rgba(59,130,246,0.55)",
     borderRadius: 14,
   };
+
+
+  
 
   if (isHidden) {
     return (
@@ -370,11 +373,11 @@ export default function KeyframeControls({
           aria-label="Color mode selection"
         >
           <button
-            onClick={() => setColorMode(COLOR_MODES.NONE)}
-            aria-pressed={colorMode === COLOR_MODES.NONE}
+            onClick={() =>  {setColorMode(COLOR_MODES.NONE); setLocalColorMode(COLOR_MODES.NONE)}}
+            aria-pressed={localColorMode === COLOR_MODES.NONE}
             title="No color coding"
             style={
-              colorMode === COLOR_MODES.NONE
+              localColorMode === COLOR_MODES.NONE
                 ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
                 : withHover(pillBtn, iconBtnHover)
             }
@@ -383,11 +386,11 @@ export default function KeyframeControls({
           </button>
 
           <button
-            onClick={() => setColorMode(COLOR_MODES.TEAM)}
-            aria-pressed={colorMode === COLOR_MODES.TEAM}
+            onClick={() => {setColorMode(COLOR_MODES.TEAM); setLocalColorMode(COLOR_MODES.TEAM)}}
+            aria-pressed={localColorMode === COLOR_MODES.TEAM}
             title="Color by team"
             style={
-              colorMode === COLOR_MODES.TEAM
+              localColorMode === COLOR_MODES.TEAM
                 ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
                 : withHover(pillBtn, iconBtnHover)
             }
@@ -395,11 +398,11 @@ export default function KeyframeControls({
             Team
           </button>
             <button
-            onClick={() => setColorMode(COLOR_MODES.MONTH)}
-            aria-pressed={colorMode === COLOR_MODES.MONTH}
+            onClick={() =>  {setColorMode(COLOR_MODES.MONTH); setLocalColorMode(COLOR_MODES.MONTH)}}
+            aria-pressed={localColorMode === COLOR_MODES.MONTH}
             title="Color by month"
             style={
-              colorMode === COLOR_MODES.MONTH
+              localColorMode === COLOR_MODES.MONTH
                 ? withHover({ ...pillBtn, ...iconBtnActive }, iconBtnActive)
                 : withHover(pillBtn, iconBtnHover)
             }

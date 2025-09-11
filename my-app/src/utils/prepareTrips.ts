@@ -13,6 +13,7 @@ export type TripDatum = {
   to?: string
 }
 
+
 export interface RouteProps {
   distance_m: number
   duration_s: number
@@ -21,9 +22,12 @@ export interface RouteProps {
   profile: "driving" | "cycling" | "walking"
   team?: string
   month?: string
+  color?: [number, number, number]
 }
 
+
 export type FC = GeoJSON.FeatureCollection<GeoJSON.LineString, RouteProps>
+
 
 // performance helper: thin dense polylines ----
 function thinPath(coords: [number, number][], maxPoints = 400) {
@@ -37,7 +41,9 @@ function thinPath(coords: [number, number][], maxPoints = 400) {
   return thinned
 }
 
-const SUBTLE_BLUE: [number, number, number] = [59, 130, 246] // #3b82f6 - single color for subtle animation
+
+const PATH_COLOR: [number, number, number] = [255, 255,255] // #3b82f6 - single color for subtle animation
+
 
 // great-circle distance in meters (fast enough for our sizes)
 export function haversineMeters(a: [number, number], b: [number, number]) {
@@ -52,6 +58,7 @@ export function haversineMeters(a: [number, number], b: [number, number]) {
   const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
 
 function getConstantSpeed(path: [number, number][], mps: number): number[] {
   const ts: number[] = new Array(path.length).fill(0);
@@ -196,11 +203,15 @@ export function toTripsData(fc: FC, timeSpeedProfile: { speeds: number[]; dt?: n
     const path = thinPath(raw, maxPointsPerPath)
     let timestamps: number[] = []
     const p = f.properties
-    console.log("TEST", JSON.stringify(f))
+    // console.log("TEST", JSON.stringify(f))
 
     if (timeSpeedProfile) {
       // Accelerating profile from start->end speed
-      timestamps = getTimeDrivenSpeedTimestamps(path, timeSpeedProfile.speeds, {  dt: timeSpeedProfile.dt, dts: timeSpeedProfile.dts});
+      timestamps = getTimeDrivenSpeedTimestamps(
+        path, 
+        timeSpeedProfile.speeds, 
+        { dt: timeSpeedProfile.dt, dts: timeSpeedProfile.dts}
+      );
     }
     else {
       timestamps = getSpeedBySegment(path);
@@ -209,7 +220,7 @@ export function toTripsData(fc: FC, timeSpeedProfile: { speeds: number[]; dt?: n
     return {
       path: path,
       timestamps,
-      color: SUBTLE_BLUE, // Single color for all trips
+      color: p.color, // Single color for all trips
       team: p.team,
       month: p.month,
       from: p.from,

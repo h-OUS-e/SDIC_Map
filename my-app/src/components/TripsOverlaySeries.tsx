@@ -3,13 +3,15 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import type maplibregl from "maplibre-gl";
 import React, { useEffect, useMemo, useRef } from "react";
 import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
-import { COLOR_MODES } from './RouteLayer';
+import { COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
 
 export type TripDatum = {
   path: [number, number][];
   timestamps: number[];
   color?: [number, number, number];
 };
+
+type colorModeProp = "usePathColor" | "none" | "team" | "month"
 
 export type Props = {
   map: maplibregl.Map | null;
@@ -30,8 +32,12 @@ export type Props = {
   timeSpeedProfile?: { speeds: number[]; dt?: number; dts?: number[] } | null;
   playState?: 'playing' | 'paused' |'idle';     // default 'playing'
   reset: boolean; 
+  colorMode:colorModeProp;
   onReset: ()=>void ;
 };
+
+
+const DEFAULT_PATH_COLOR = hexToRGB(END_COLOR)
 
 function getMaxTimestamp(arr: TripDatum[]): number {
   let maxT = 0;
@@ -57,7 +63,8 @@ export default function TripsOverlaySeries({
   timeSpeedProfile = null,
   playState = 'playing',
   reset,
-  onReset
+  onReset,
+  colorMode="none"
 }: Props) {
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -66,8 +73,8 @@ export default function TripsOverlaySeries({
   const currentTimeRef = useRef<number>(0);
   const holdUntilRef = useRef<number | null>(null);
   const resetRef = useRef<boolean>(false);
+  const colorModeRef = useRef<colorModeProp>(colorMode);
 
-  console.log("TES T", onReset)
   // Prepare geoJSON with timestamps (your helper accepts these args)
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
@@ -202,7 +209,18 @@ export default function TripsOverlaySeries({
       trailLength: trail,
       getPath: (d) => d.path,
       getTimestamps: (d) => d.timestamps,
-      getColor: (d, {index}) =>{console.log("TEST", d.color, d); return [255,255,255]},
+      getColor: (path, {index}) => {
+        // console.log("TTTT", DEFAULT_PATH_COLOR, path.color, colorModeRef)
+
+        if (colorModeRef.current === "usePathColor") {
+          return path.color? path.color : DEFAULT_PATH_COLOR as [number, number, number, number];
+        }
+        else {
+          const HEX = getFeatureColor(path, colorModeRef.current, END_COLOR)
+          const color = hexToRGB(HEX)
+          return color? color as [number, number, number, number]: DEFAULT_PATH_COLOR as [number, number, number, number];
+        } 
+      },          
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,
@@ -221,8 +239,14 @@ export default function TripsOverlaySeries({
       // draw the reset frame immediately
       overlayRef.current?.setProps({ layers: makeLayers(0) });
       onReset();
-      resetRef.current = false
+      resetRef.current = false;
   }, [reset]);
+
+
+  // Update color mode if it is updated as an input
+  useEffect (() => {
+    colorModeRef.current = colorMode;
+  }, [colorMode])
 
 
   // Start/drive the animation loop whenever inputs change

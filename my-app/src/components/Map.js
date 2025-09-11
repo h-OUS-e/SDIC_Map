@@ -290,13 +290,21 @@ export default function Map() {
                         />
                     )}
 
-                    {/* Location labels — show location names at zoom 14-15 */}
+                    {/* Location labels — show location names at zoom 13-15 */}
                     {map.current && (
                         <MapLocationLabels
                             map={map.current}
                             layers={[`${layerId}-endpoint-hit`]}
-                            minZoom={14}
+                            minZoom={13}
                             maxZoom={15}
+                            showOriginLabel={true}
+                            filterEvents={[
+                                "Built on Bedrock Demo Night",
+                                "AI After Hours", 
+                                "Pitch Global: Startup Pitch Night",
+                                "Phone a (AI) Friend with Anthropic",
+                                "Robotics Club SF: Simulation as a Service"
+                            ]}
                         />
                     )}
                 </>                 

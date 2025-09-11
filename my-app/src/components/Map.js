@@ -19,44 +19,76 @@ const isAutoStart = true;
 
 // Build your keyframes (same views you had, just as a list):
 const initialView = {
-  center: [-122.43609, 37.77169],
-  zoom: 11,
-  bearing: 0,
-  pitch: 0,
-  duration: 200,
-  easing: easingFunctions.easeInOut,
+    center: [-122.43609, 37.77169],
+    zoom: 11,
+    bearing: 0,
+    pitch: 0,
+    duration: 200,
+    easing: easingFunctions.easeInOut,
 };
 const sfView1 = {
-  center: [-122.40451, 37.79837],
-  zoom: 14.5,
-  bearing: 0,
-  pitch: 0,
-  duration: 8000,
-  easing: easingFunctions.easeInOut,
+    center: [-122.40451, 37.79837],
+    zoom: 14.5,
+    bearing: 0,
+    pitch: 0,
+    duration: 8000,
+    easing: easingFunctions.easeInOut,
 };
 const sfView2 = {
-  center: [-122.40451, 37.79837],
-  zoom: 14,
-  bearing: 60,
-  pitch: 25,
-  duration: 8000,
-  easing: easingFunctions.easeInOut,
+    center: [-122.40451, 37.79837],
+    zoom: 14,
+    bearing: 60,
+    pitch: 25,
+    duration: 8000,
+    easing: easingFunctions.easeInOut,
 };
 const sfView3 = {
-  center: [-122.40451, 37.79837],
-  zoom: 13.5,
-  bearing: 60,
-  pitch: 25,
-  duration: 5000,
-  easing: easingFunctions.easeInOut,
+    center: [-122.40451, 37.79837],
+    zoom: 13.5,
+    bearing: 60,
+    pitch: 25,
+    duration: 5000,
+    easing: easingFunctions.easeInOut,
 };
 const bayAreaView = {
-  center: [-122.27463, 37.61096],
-  zoom: 10.25,
-  bearing: 0,
-  pitch: 0,
-  duration: 8000,
-  easing: easingFunctions.easeInOut,
+    center: [-122.27463, 37.61096],
+    zoom: 10.25,
+    bearing: 0,
+    pitch: 0,
+    duration: 8000,
+    easing: easingFunctions.easeInOut,
+};
+const bayAreaViewPause = {
+    center: [-122.27463, 37.61096],
+    zoom: 10.25,
+    bearing: 0,
+    pitch: 0,
+    duration: 4000,
+    easing: easingFunctions.easeInOut,
+};
+const billboard1 = {
+    center: [-122.09917, 37.42747],
+    zoom: 12.8,
+    bearing: -0,
+    pitch: 0,
+    duration: 5000,
+    easing: easingFunctions.easeInOut,
+};
+const billboard2 = {
+    center: [-122.13066, 37.45415],
+    zoom: 18.0,
+    bearing: 0,
+    pitch: 0,
+    duration: 5000,
+    easing: easingFunctions.easeInOut,
+};
+const billboard3 = {
+    center: [-122.17722, 37.48122],
+    zoom: 17.0,
+    bearing: 0,
+    pitch: 0,
+    duration: 5000,
+    easing: easingFunctions.easeInOut,
 };
 
 const lastView = {
@@ -64,7 +96,10 @@ const lastView = {
   duration: 5000, // overrides the original duration
 };
 
-const keyframes = [initialView, sfView1, sfView2, sfView3, bayAreaView, lastView];
+const keyframes = [
+    initialView, sfView1, sfView2, sfView3, bayAreaView, bayAreaViewPause,
+    billboard1, billboard2, billboard3, lastView,
+];
 
 
 function getBasePath() {

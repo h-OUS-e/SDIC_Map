@@ -59,7 +59,7 @@ export function useKeyframeAnimation(
 
   useEffect(() => { indexRef.current = index; }, [index]);
   useEffect(() => { statusRef.current = status; console.log("TEST 5", status)}, [status]);
-  useEffect(() => { keyframesRef.current = keyframes; }, [keyframes]);
+
 
   // --- Helpers
   const getSnapshot = useCallback(() => {
@@ -285,6 +285,49 @@ export function useKeyframeAnimation(
     // cleanup: if unmounting mid-animation, abort
     return () => abortInFlight();
   }, [abortInFlight, autoStart, map, total]);
+
+
+  // put this below your other effects
+  useEffect(() => {
+    if (!initialKeyframes || initialKeyframes.length === 0) return;
+
+    // 1) sync state + refs
+    setKeyframes(initialKeyframes);
+    keyframesRef.current = initialKeyframes;
+
+    // 2) clamp index if needed
+    const clampedIndex = Math.min(indexRef.current, initialKeyframes.length - 1);
+    if (clampedIndex !== indexRef.current) setIndex(clampedIndex);
+
+    // 3) react based on current status
+    const kf = initialKeyframes[clampedIndex];
+
+    if (statusRef.current === "playing") {
+      // Abort current tween and continue playing from the same index with new keyframes
+      abortInFlight();
+      controllerRef.current = new AbortController();
+
+      (async () => {
+        for (let i = clampedIndex; i < initialKeyframes.length; i++) {
+          if (statusRef.current !== "playing") break;
+          setIndex(i);
+          await animateTo(initialKeyframes[i], controllerRef.current.signal);
+          if (statusRef.current !== "playing") break;
+        }
+        if (statusRef.current === "playing") {
+          setStatus("idle");
+          statusRef.current = "idle";
+          if (autoResetOnEnd) setIndex(0);
+          onEnd?.();
+        }
+        controllerRef.current = null;
+      })();
+    } else {
+      // paused or idle: immediately reflect the new list in the view
+      if (kf) jumpTo(kf);
+    }
+  }, [initialKeyframes]); // <-- key: react to changes here
+
 
   return {
     // state

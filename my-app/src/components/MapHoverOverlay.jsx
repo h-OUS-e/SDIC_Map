@@ -211,11 +211,6 @@ export default function MapHoverOverlay({
 
     
 
-    
-
-    
-
-
     const panelTheme = useMemo(() => {
         if (!feats?.length) return null;
 

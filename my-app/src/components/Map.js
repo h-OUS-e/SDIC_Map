@@ -88,6 +88,8 @@ export default function Map() {
     // route data
     const [geoJSON, setGeoJSON] = useState([]);
 
+    const [resetTripsOverlay, setResetTripsOverlay] = useState([false])
+
     // [KEYFRAME ANIMATION] Initialize keyframe animation system
     const tripsOverlayRef = useRef(null);
     
@@ -101,15 +103,16 @@ export default function Map() {
 
 
     // Inside a component:
-    const {
-        status, isPlaying, isPaused, index: currentKeyframeIndex, total,
-        play, pause, resume, stop, reset, next, previous, jumpTo
-        } = useKeyframeAnimation(map.current, keyframes, {
-        autoStart: isAutoStart,         // start automatically once map loads
-        autoResetOnEnd: false,   // set to true if you want index to return to 0 when finished
-        onStart: () => {/* optional */},
-        onEnd: () => {/* optional */},
-    });
+    const {status, index: currentKeyframeIndex, pause, resume, reset, next, previous} = useKeyframeAnimation(
+        map.current, 
+        keyframes, 
+        {
+            autoStart: isAutoStart,         // start automatically once map loads
+            autoResetOnEnd: false,   // set to true if you want index to return to 0 when finished
+            onStart: () => {/* optional */},
+            onEnd: () => {/* optional */},
+        }
+    );
 
     // live view info for on-screen readout
     const [viewInfo, setViewInfo] = useState({
@@ -239,7 +242,7 @@ export default function Map() {
                     onPrevious={previous}
                     onResume={resume}
                     onStop={pause}
-                    onReset={reset}
+                    onReset={() => {reset(); setResetTripsOverlay(true)}}
                     onToggleView={toggleView}
                     isZoomedOut={isZoomedOut}
                     onToggleSmoothed={toggleSmoothed}
@@ -258,31 +261,19 @@ export default function Map() {
                     <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed}  colorMode={colorMode}/>
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
-                        // <TripsOverlay
-                        //     ref={tripsOverlayRef}
-                        //     map={map.current}
-                        //     geoJSON={geoJSON}
-                        //     fps={30}
-                        //     trail={900}
-                        //     opacity={.3}
-                        //     lineWidth={1.5}
-                        //     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                        //     timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
-                        // />
-
                         <TripsOverlaySeries
-                            ref={tripsOverlayRef}
+                            // ref={tripsOverlayRef}
                             map={map.current}
                             geoJSON={geoJSON}
                             fps={30}
                             trail={900}
                             opacity={.3}
                             lineWidth={1.5}
-                            colorMode="month"        // "none" | "team" | "month"
-                            autoplayGroups={true}
-                            groupPause={2}
-                            loop={true}
-                            loopDelay={3}
+                            // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                            timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
+                            playState={status}
+                            reset={resetTripsOverlay}
+                            onReset = {() =>{setResetTripsOverlay(false)}}
                         />
                     )}
 

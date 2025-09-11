@@ -28,6 +28,9 @@ export type Props = {
   loopDelay?: number; 
   /** Time-driven profile: { speeds: number[], dt?: number, dts?: number[] } */
   timeSpeedProfile?: { speeds: number[]; dt?: number; dts?: number[] } | null;
+  playState?: 'playing' | 'paused' |'idle';     // default 'playing'
+  reset: boolean; 
+  onReset: ()=>void ;
 };
 
 function getMaxTimestamp(arr: TripDatum[]): number {
@@ -52,6 +55,9 @@ export default function TripsOverlaySeries({
   loopDelay = 5, 
   loop = true,
   timeSpeedProfile = null,
+  playState = 'playing',
+  reset,
+  onReset
 }: Props) {
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -59,7 +65,9 @@ export default function TripsOverlaySeries({
   const lastTickMsRef = useRef<number>(0);
   const currentTimeRef = useRef<number>(0);
   const holdUntilRef = useRef<number | null>(null);
+  const resetRef = useRef<boolean>(false);
 
+  console.log("TES T", onReset)
   // Prepare geoJSON with timestamps (your helper accepts these args)
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
@@ -194,7 +202,7 @@ export default function TripsOverlaySeries({
       trailLength: trail,
       getPath: (d) => d.path,
       getTimestamps: (d) => d.timestamps,
-      getColor: (d, {index}) =>{console.log("TEST", d.color, d); return d.color ?? [5,5,5]},
+      getColor: (d, {index}) =>{console.log("TEST", d.color, d); return [255,255,255]},
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,
@@ -202,12 +210,33 @@ export default function TripsOverlaySeries({
       jointRounded: true,
     }),
   ];
+  
+
+  useEffect(() => {
+    if (reset === undefined || resetRef.current === true || reset === false ) return;
+      resetRef.current = true
+      currentTimeRef.current = 0;
+      holdUntilRef.current = null;
+      startWallMsRef.current = null;
+      // draw the reset frame immediately
+      overlayRef.current?.setProps({ layers: makeLayers(0) });
+      onReset();
+      resetRef.current = false
+  }, [reset]);
 
 
   // Start/drive the animation loop whenever inputs change
   useEffect(() => {
     if (!overlayRef.current) return;
-    
+
+    // If we're paused, do not start RAF. Leave the last frame visible.
+    if (playState === 'paused' || playState === 'idle') {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      return;
+    }    
 
     // Reset clock
     startWallMsRef.current = null;
@@ -254,7 +283,6 @@ export default function TripsOverlaySeries({
       current = Math.min(nextTime, maxTs);
     }
 
-
       currentTimeRef.current = current;
       startWallMsRef.current = tMs; // reset for delta on next frame
 
@@ -300,7 +328,7 @@ export default function TripsOverlaySeries({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [layerData, lineWidth, opacity, fps, loop, maxTs, loopDelay, longestTripIndex, speedAtTime]);
+  }, [layerData, lineWidth, opacity, fps, loop, maxTs, loopDelay, longestTripIndex, speedAtTime, playState]);
 
   return null;
 }

@@ -67,25 +67,61 @@ const bayAreaViewPause = {
     easing: easingFunctions.easeInOut,
 };
 const billboard1 = {
-    center: [-122.09917, 37.42747],
-    zoom: 12.8,
-    bearing: -0,
-    pitch: 0,
-    duration: 5000,
+    center: [-122.39448, 37.67141],
+    zoom: 15,
+    bearing: -30,
+    pitch: 65,
+    duration: 2600,
     easing: easingFunctions.easeInOut,
 };
 const billboard2 = {
     center: [-122.13066, 37.45415],
     zoom: 18.0,
-    bearing: 0,
-    pitch: 0,
-    duration: 5000,
+    bearing: -52,
+    pitch: 70,
+    duration: 6000,
     easing: easingFunctions.easeInOut,
 };
 const billboard3 = {
-    center: [-122.17722, 37.48122],
+    center: [-122.40751, 37.76422],
     zoom: 17.0,
-    bearing: 0,
+    bearing: -30,
+    pitch: 78,
+    duration: 8000,
+    easing: easingFunctions.easeInOut,
+};
+const billboard3Pause = {...COLOR_MODES,
+    duration: 1600,
+};
+const billboard4 = {
+    center: [-122.27178, 37.52712],
+    zoom: 17.5,
+    bearing: -45,
+    pitch: 85,
+    duration: 4500,
+    easing: easingFunctions.easeInOut,
+};
+const billboard5 = {
+    center: [-122.39789, 37.62401],
+    zoom: 15.2,
+    bearing: -25,
+    pitch: 72,
+    duration: 7000,
+    easing: easingFunctions.easeInOut,
+};
+const billboard6 = {
+    center: [-122.41332, 37.62401],
+    zoom: 14.2,
+    bearing: -3,
+    pitch: 60,
+    duration: 17000,
+    easing: easingFunctions.linear,
+};
+
+const sfView = {
+    center: [-122.38279, 37.68716],
+    zoom: 12.5,
+    bearing: -0,
     pitch: 0,
     duration: 5000,
     easing: easingFunctions.easeInOut,
@@ -93,12 +129,14 @@ const billboard3 = {
 
 const lastView = {
   ...bayAreaView,
-  duration: 5000, // overrides the original duration
+  duration: 4000, // overrides the original duration
+  easing: easingFunctions.easeInOut,
 };
 
 const keyframes = [
     initialView, sfView1, sfView2, sfView3, bayAreaView, bayAreaViewPause,
-    billboard1, billboard2, billboard3, lastView,
+     billboard1, billboard3, 
+    lastView,
 ];
 
 
@@ -197,6 +235,7 @@ export default function Map() {
             style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
             center: initialState.center,
             zoom: initialState.zoom,
+            maxPitch: 89,
         });
 
         map.current.addControl(new maplibregl.NavigationControl(), 'top-right');

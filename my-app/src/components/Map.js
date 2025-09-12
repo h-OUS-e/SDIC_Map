@@ -7,6 +7,7 @@ import RouteLayer, { COLOR_MODES } from './RouteLayer';
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
+import MapLocationLabels from "./MapLocationLabels";
 import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
@@ -388,7 +389,25 @@ export default function Map() {
                             layers={[`${layerId}-endpoint-hit`]}
                             offset={{ x: 14, y: 14 }}
                         />
-                    )};
+                    )}
+
+                    {/* Location labels — show location names at zoom 13-15 */}
+                    {map.current && (
+                        <MapLocationLabels
+                            map={map.current}
+                            layers={[`${layerId}-endpoint-hit`]}
+                            minZoom={13}
+                            maxZoom={15}
+                            showOriginLabel={true}
+                            filterEvents={[
+                                "Built on Bedrock Demo Night",
+                                "AI After Hours", 
+                                "Pitch Global: Startup Pitch Night",
+                                "Phone a (AI) Friend with Anthropic",
+                                "Robotics Club SF: Simulation as a Service"
+                            ]}
+                        />
+                    )}
                 </>                 
             )}
         </div>

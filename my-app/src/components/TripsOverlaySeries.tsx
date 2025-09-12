@@ -1,7 +1,8 @@
 import { TripsLayer } from "@deck.gl/geo-layers";
 import { MapboxOverlay } from "@deck.gl/mapbox";
+import { Layer, LayersList } from "deck.gl";
 import type maplibregl from "maplibre-gl";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
 import { COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
 
@@ -14,7 +15,8 @@ export type TripDatum = {
 type colorModeProp = "usePathColor" | "none" | "team" | "month"
 
 export type Props = {
-  map: maplibregl.Map | null;
+  id: string;
+  map?: maplibregl.Map | null; // Now optional since we get it from context
   geoJSON: FC;
   /** seconds of tail we keep lit */
   trail?: number;
@@ -30,14 +32,102 @@ export type Props = {
   loopDelay?: number; 
   /** Time-driven profile: { speeds: number[], dt?: number, dts?: number[] } */
   timeSpeedProfile?: { speeds: number[]; dt?: number; dts?: number[] } | null;
-  playState?: 'playing' | 'paused' |'idle';     // default 'playing'
+  playState?: 'playing' | 'paused' |'idle';
   reset: boolean; 
-  colorMode:colorModeProp;
-  onReset: ()=>void ;
+  colorMode: colorModeProp;
+  onReset: ()=>void;
 };
 
+// Context type definition
+type TripsOverlayContextType = {
+  registerLayer: (id: string, layerFactory: () => void) => void;
+  unregisterLayer: (id: string) => void;
+  updateOverlay: () => void;
+  isReady: boolean;
+  map: maplibregl.Map | null;
+};
 
-const DEFAULT_PATH_COLOR = hexToRGB(END_COLOR)
+// Create the context
+export const TripsOverlayContext = createContext<TripsOverlayContextType | null>(null);
+
+// Provider component that manages the single MapboxOverlay instance
+export function TripsOverlayProvider({ 
+  map, 
+  children 
+}: { 
+  map: maplibregl.Map | null; 
+  children: React.ReactNode;
+}) {
+  const overlayRef = useRef<MapboxOverlay | null>(null);
+  const layersMapRef = useRef(new Map());
+  const [isReady, setIsReady] = useState(false);
+
+  // Create and attach the single overlay
+  useEffect(() => {
+    if (!map) return;
+
+    if (!overlayRef.current) {
+      overlayRef.current = new MapboxOverlay({ interleaved: true });
+      console.log("Creating single shared MapboxOverlay", overlayRef.current);
+      map.addControl(overlayRef.current);
+      setIsReady(true);
+    }
+
+    return () => {
+      if (overlayRef.current) {
+        try {
+          map.removeControl(overlayRef.current);
+        } catch (e) {
+          console.error("Error removing overlay:", e);
+        }
+        overlayRef.current = null;
+        setIsReady(false);
+      }
+    };
+  }, [map]);
+
+  // Register a layer
+  const registerLayer = (id: string, layerFactory: () => void) => {
+    layersMapRef.current.set(id, layerFactory);
+    updateOverlay();
+  };
+
+  // Unregister a layer
+  const unregisterLayer = (id: string) => {
+    layersMapRef.current.delete(id);
+    updateOverlay();
+  };
+
+  // Update the overlay with all registered layers
+  const updateOverlay = () => {
+    if (!overlayRef.current) return;
+    
+    const allLayers: (false | LayersList | Layer | null | undefined)[] = [];
+    layersMapRef.current.forEach((layerFactory) => {
+      const layer = layerFactory();
+      if (layer) allLayers.push(layer);
+    });
+    
+    overlayRef.current.setProps({ layers: allLayers });
+  };
+
+  const contextValue: TripsOverlayContextType = {
+    registerLayer,
+    unregisterLayer,
+    updateOverlay,
+    isReady,
+    map
+  };
+
+  return (
+    <TripsOverlayContext.Provider value={contextValue}>
+      {children}
+    </TripsOverlayContext.Provider>
+  );
+}
+
+// Helper functions
+const DEFAULT_PATH_COLOR = hexToRGB(END_COLOR);
 
 function getMaxTimestamp(arr: TripDatum[]): number {
   let maxT = 0;
@@ -51,8 +141,10 @@ function getMaxTimestamp(arr: TripDatum[]): number {
   return maxT;
 }
 
+// Modified TripsOverlaySeries component
 export default function TripsOverlaySeries({
-  map,
+  id,
+  map: mapProp, // Can still accept map as prop for backwards compatibility
   geoJSON,
   trail = 900,
   lineWidth = 4,
@@ -64,9 +156,15 @@ export default function TripsOverlaySeries({
   playState = 'playing',
   reset,
   onReset,
-  colorMode="none"
+  colorMode = "none"
 }: Props) {
-  const overlayRef = useRef<MapboxOverlay | null>(null);
+  // Get the shared context
+  const context = useContext(TripsOverlayContext);
+  
+  // Use map from context if available, otherwise fall back to prop
+  const map = context?.map || mapProp;
+  
+  // Animation state refs
   const rafRef = useRef<number | null>(null);
   const startWallMsRef = useRef<number | null>(null);
   const lastTickMsRef = useRef<number>(0);
@@ -75,7 +173,7 @@ export default function TripsOverlaySeries({
   const resetRef = useRef<boolean>(false);
   const colorModeRef = useRef<colorModeProp>(colorMode);
 
-  // Prepare geoJSON with timestamps (your helper accepts these args)
+  // Prepare geoJSON with timestamps
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
   // Layer data
@@ -170,39 +268,11 @@ export default function TripsOverlaySeries({
     };
   }, [timeSpeedProfile]);
 
-  // Create / attach overlay
-  useEffect(() => {
-    if (!map) return;
-    if (!overlayRef.current) {
-      overlayRef.current = new MapboxOverlay({});
-      map.addControl(overlayRef.current);
-    }
-    return () => {
-      if (overlayRef.current) {
-        try {
-          map.removeControl(overlayRef.current);
-        } catch {}
-        overlayRef.current = null;
-      }
-    };
-  }, [map]);
-
-  const PALETTE: [number, number, number][] = [
-  [166, 206, 0],
-  [31, 120, 180],
-  [178, 223, 138],
-  [51, 160, 44],
-  [251, 154, 153],
-  [227, 26, 28],
-  [253, 191, 111],
-  [255, 127, 0],
-  [202, 178, 214],
-  [106, 61, 154],
-];
-  // Build a layer factory that we can call every frame with a new currentTime
-  const makeLayers = (nowS: number) => [
-    new TripsLayer<TripDatum>({
-      id: "trips-overlay",
+  // Create layer factory function
+  const createLayer = (nowS: number) => {
+    return new TripsLayer<TripDatum>({
+      id: id,
+      beforeId: "saved-route-line-endpoint-glow4",
       data: layerData,
       opacity,
       currentTime: nowS,
@@ -210,57 +280,90 @@ export default function TripsOverlaySeries({
       getPath: (d) => d.path,
       getTimestamps: (d) => d.timestamps,
       getColor: (path, {index}) => {
-        // console.log("TTTT", DEFAULT_PATH_COLOR, path.color, colorModeRef)
-
         if (colorModeRef.current === "usePathColor") {
-          return path.color? path.color : DEFAULT_PATH_COLOR as [number, number, number, number];
+          return path.color ? path.color : DEFAULT_PATH_COLOR as [number, number, number, number];
+        } else {
+          const HEX = getFeatureColor(path, colorModeRef.current, END_COLOR);
+          const color = hexToRGB(HEX);
+          return color ? color as [number, number, number, number] : DEFAULT_PATH_COLOR as [number, number, number, number];
         }
-        else {
-          const HEX = getFeatureColor(path, colorModeRef.current, END_COLOR)
-          const color = hexToRGB(HEX)
-          return color? color as [number, number, number, number]: DEFAULT_PATH_COLOR as [number, number, number, number];
-        } 
-      },          
+      },
       widthUnits: "pixels",
       getWidth: lineWidth,
       rounded: true,
       capRounded: true,
       jointRounded: true,
-    }),
-  ];
-  
+    });
+  };
 
+  // Register this layer with the context (or create own overlay if no context)
   useEffect(() => {
-    if (reset === undefined || resetRef.current === true || reset === false ) return;
-      resetRef.current = true
-      currentTimeRef.current = 0;
-      holdUntilRef.current = null;
-      startWallMsRef.current = null;
-      // draw the reset frame immediately
-      overlayRef.current?.setProps({ layers: makeLayers(0) });
-      onReset();
-      resetRef.current = false;
-  }, [reset]);
+    if (context?.isReady) {
+      // Using shared overlay through context
+      const layerFactory = () => createLayer(currentTimeRef.current);
+      context.registerLayer(id, layerFactory);
 
+      return () => {
+        context.unregisterLayer(id);
+      };
+    } else if (map && !context) {
+      // Fallback: create own overlay if no context provided (backwards compatibility)
+      console.warn(`TripsOverlaySeries ${id}: No TripsOverlayProvider found. Creating individual overlay (not recommended for multiple layers).`);
+      
+      // This is the old behavior - you might want to keep this for backwards compatibility
+      // or remove it to enforce using the provider
+      const overlay = new MapboxOverlay({ interleaved: false }); // Use false when standalone
+      map.addControl(overlay);
+      
+      // Set initial layer
+      overlay.setProps({ layers: [createLayer(0)] });
+      
+      // Store overlay reference for animation updates
+      // You'd need to handle this differently...
+      
+      return () => {
+        try {
+          map.removeControl(overlay);
+        } catch {}
+      };
+    }
+  }, [id, context, layerData, lineWidth, opacity, trail, map]);
 
-  // Update color mode if it is updated as an input
-  useEffect (() => {
+  // Handle reset
+  useEffect(() => {
+    if (reset === undefined || resetRef.current === true || reset === false) return;
+    resetRef.current = true;
+    currentTimeRef.current = 0;
+    holdUntilRef.current = null;
+    startWallMsRef.current = null;
+    
+    // Update through context if available
+    if (context) {
+      context.updateOverlay();
+    }
+    
+    onReset();
+    resetRef.current = false;
+  }, [reset, onReset, context]);
+
+  // Update color mode if it changes
+  useEffect(() => {
     colorModeRef.current = colorMode;
-  }, [colorMode])
+  }, [colorMode]);
 
-
-  // Start/drive the animation loop whenever inputs change
+  // Animation loop
   useEffect(() => {
-    if (!overlayRef.current) return;
+    // Only run animation if we have context (shared overlay) or map
+    if (!context?.isReady && !map) return;
 
-    // If we're paused, do not start RAF. Leave the last frame visible.
+    // If we're paused, do not start RAF
     if (playState === 'paused' || playState === 'idle') {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
       return;
-    }    
+    }
 
     // Reset clock
     startWallMsRef.current = null;
@@ -281,31 +384,31 @@ export default function TripsOverlaySeries({
 
       // Advance simulation time in seconds
       const elapsedS = (tMs - startWallMsRef.current) / 1000;
-      const nextTime = currentTimeRef.current + elapsedS
+      const nextTime = currentTimeRef.current + elapsedS;
 
       // Loop or clamp
       let current: number;
       if (loop && maxTs > 0) {
-      if (holdUntilRef.current != null) {
-        if (tMs < holdUntilRef.current) {
-          current = maxTs - 1e-6; // parked just shy of the end
+        if (holdUntilRef.current != null) {
+          if (tMs < holdUntilRef.current) {
+            current = maxTs - 1e-6; // parked just shy of the end
+          } else {
+            holdUntilRef.current = null;
+            current = 0;
+            startWallMsRef.current = tMs; // reset integration
+          }
         } else {
-          holdUntilRef.current = null;
-          current = 0;
-          startWallMsRef.current = tMs; // reset integration
+          const candidate = currentTimeRef.current + elapsedS;
+          if (candidate >= maxTs && (loopDelay ?? 0) > 0) {
+            current = maxTs - 1e-6;
+            holdUntilRef.current = tMs + (loopDelay! * 1000);
+          } else {
+            current = candidate % maxTs;
+          }
         }
       } else {
-        const candidate = currentTimeRef.current + elapsedS;
-        if (candidate >= maxTs && (loopDelay ?? 0) > 0) {
-          current = maxTs - 1e-6;
-          holdUntilRef.current = tMs + (loopDelay! * 1000);
-        } else {
-          current = candidate % maxTs;
-        }
+        current = Math.min(nextTime, maxTs);
       }
-    } else {
-      current = Math.min(nextTime, maxTs);
-    }
 
       currentTimeRef.current = current;
       startWallMsRef.current = tMs; // reset for delta on next frame
@@ -321,19 +424,21 @@ export default function TripsOverlaySeries({
       if (trip) {
         const vApprox = approxSpeedFromTrip(trip, t);
         if (vApprox != null && Number.isFinite(vApprox)) {
-          // console.log(`t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
+          // console.log(`${id} t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
         }
       }
 
       // Optional: also log theoretical schedule v(t) if provided
       if (speedAtTime) {
         const vSched = speedAtTime(t);
-        // console.log(`t=${t.toFixed(2)}s scheduleSpeed=${vSched.toFixed(2)} m/s`);
+        // console.log(`${id} t=${t.toFixed(2)}s scheduleSpeed=${vSched.toFixed(2)} m/s`);
       }
       // ----------------------------------------
 
-      // Push new layers to the overlay
-      overlayRef.current?.setProps({ layers: makeLayers(current) });
+      // Update overlay through context
+      if (context) {
+        context.updateOverlay();
+      }
 
       // Stop at the end if not looping
       if (!loop && current >= maxTs) {
@@ -352,7 +457,7 @@ export default function TripsOverlaySeries({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [layerData, lineWidth, opacity, fps, loop, maxTs, loopDelay, longestTripIndex, speedAtTime, playState]);
+  }, [layerData, lineWidth, opacity, fps, loop, maxTs, loopDelay, longestTripIndex, speedAtTime, playState, context, id]);
 
   return null;
 }

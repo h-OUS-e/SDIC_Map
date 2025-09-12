@@ -86,7 +86,7 @@ function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETT
 
 
 export const getFeatureColor = (props, colorBy, fallback) => {
-  if (colorBy === COLOR_MODES.NONE) return fallback;
+  if (colorBy === COLOR_MODES.NONE) {console.log("returning"); return fallback};
   const key = colorBy === COLOR_MODES.TEAM ? props?.team : props?.month;
   if (!key) return fallback;
   return colorBy === COLOR_MODES.TEAM
@@ -502,7 +502,6 @@ export default function RouteLayer({
         // Avoid duplicate sends for the same object reference
         if (lastSentRef.current !== fcIndexedWithBase) {
             lastSentRef.current = fcIndexedWithBase;
-            console.log("TTTTEST", fcIndexedWithBase.features)
             try {
                 onData(fcIndexedWithBase); // sends the displayed collection (smoothed or original) to the parent
                 // console.debug("[RouteLayer] onData sent FC with", fc.features.length, "features");

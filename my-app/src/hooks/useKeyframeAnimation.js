@@ -58,7 +58,7 @@ export function useKeyframeAnimation(
   const pausedViewRef = useRef/** @type {null | {center:[number,number],zoom:number,bearing:number,pitch:number}} */(null);
 
   useEffect(() => { indexRef.current = index; }, [index]);
-  useEffect(() => { statusRef.current = status; console.log("TEST 5", status)}, [status]);
+  useEffect(() => { statusRef.current = status}, [status]);
 
 
   // --- Helpers
@@ -144,7 +144,6 @@ export function useKeyframeAnimation(
 
     // Play from current index to end
     for (let i = start; i < total; i++) {
-      console.log("TEST", statusRef.current)
       if (statusRef.current !== "playing") break;
       setIndex(i);
       await animateTo(keyframesRef.current[i], controllerRef.current.signal);
@@ -266,7 +265,6 @@ export function useKeyframeAnimation(
 
   // --- Autostart once map is ready
   useEffect(() => {
-    console.log("TTT", autoStartedRef.current, map, total)
     if (!autoStart || autoStartedRef.current || !map || total === 0) return;
 
     const start = () => {

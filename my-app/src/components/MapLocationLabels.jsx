@@ -1,288 +1,239 @@
 // MapLocationLabels.jsx
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * Props:
- *  - map: maplibregl.Map (required)
- *  - layers: string[]      -> layer IDs to listen on (required)
- *  - minZoom?: number     -> minimum zoom level to show labels (default 13)
- *  - maxZoom?: number     -> maximum zoom level to show labels (default 15)
- *  - className?: string   -> optional class for the label container
- *  - filterEvents?: string[] -> array of activity names to show (optional)
+ * REFACTORED PROPS:
+ * - map: maplibregl.Map (required)
+ * - sourceIdOrigin: string     -> ID of the GeoJSON source containing the start points (required) * 
+ * - sourceIdEnd: string     -> ID of the GeoJSON source containing the end points (required)
+ * - minZoom?: number      -> minimum zoom level to show labels
+ * - maxZoom?: number      -> maximum zoom level to show labels
+ * - filterEvents?: string[] -> array of activity names to show (optional)
+ * - showOriginLabel?: boolean -> whether to show the separate SDIC origin label
  */
 export default function MapLocationLabels({
     map,
-    layers,
-    minZoom = 14,
-    maxZoom = 15,
-    className = "",
+    sourceIdOrigin,
+    sourceIdEnd,
+    minZoomL = 10,
+    maxZoomL = 18,
+    minZoomM = 13,
+    maxZoomM = 18,
+    minZoomS = 15,
+    maxZoomS = 18,
     filterEvents = null,
-    showOriginLabel = true
+    showOriginLabel = true,
 }) {
+    // --- State for the separate, DOM-based SDIC label ---
     const [container, setContainer] = useState(null);
     const [zoom, setZoom] = useState(null);
-    const [features, setFeatures] = useState([]);
-    const [isVisible, setIsVisible] = useState(false);
-    const cleanupFnsRef = useRef([]);
-    
-    // SDIC origin point coordinates (735 Battery Street, San Francisco)
+    const [sdicPosition, setSdicPosition] = useState(null);
     const SDIC_ORIGIN = [-122.40109460000001, 37.7981955];
-    
-    // Check if current zoom level is within the range to show labels
-    const shouldShowLabels = zoom !== null && zoom >= minZoom && zoom <= maxZoom;
-    
-    // Check if SDIC origin label should be shown (zoom >= 10)
     const shouldShowSDICLabel = zoom !== null && zoom >= 10 && showOriginLabel;
-    
-    // Smooth animation control
+    const labelsLayerIdS = "location-labels-small";
+    const labelsLayerIdM = "location-labels-medium";
+    const labelsLayerIdOrigin = "location-labels-origin";
+
+    // --- Core Logic for MapLibre Symbol Layer ---
     useEffect(() => {
-        if (shouldShowLabels) {
-            // Small delay to ensure smooth appearance
-            const timer = setTimeout(() => setIsVisible(true), 50);
-            return () => clearTimeout(timer);
-        } else {
-            setIsVisible(false);
-        }
-    }, [shouldShowLabels]);
-    
-    // Samsung font styles for location names
-    const locationNameStyle = {
-        fontFamily: "'SamsungSharpSans', 'SamsungOne', system-ui, -apple-system, sans-serif",
-        fontWeight: 500,
-        fontSize: "12px",
-        lineHeight: "1.4",
-        color: "rgba(255, 255, 255, 0.9)",
-        letterSpacing: "0.02em",
-        textShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
-        whiteSpace: "nowrap",
-        // Smooth transitions for fade in/out
-        transition: "opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? "translate(-50%, -50%) scale(1)" : "translate(-50%, -50%) scale(0.9)",
-        pointerEvents: isVisible ? "none" : "none"
-    };
+        if (!map || !sourceIdOrigin || !sourceIdEnd) return;
 
-    // SDIC origin label style with zoom-based sizing
-    // Smoothly interpolate font size between 12px (zoom 12 and below) and 16px (zoom 13 and above)
-    const getSDICLabelStyle = () => {
-        let fontSize = 12;
-        if (typeof zoom === "number") {
-            if (zoom <= 12) {
-                fontSize = 12;
-            } else if (zoom >= 13) {
-                fontSize = 16;
-            } else {
-                // Smooth interpolation between 12 and 16 for zoom 12 < z < 13
-                fontSize = 12 + (zoom - 12) * (16 - 12) / (13 - 12);
+        // Wait for the source data to be available before adding the layer
+        const addLayerWhenReady = () => {
+
+            if (!map.getSource(sourceIdEnd)) {
+
+                // If source doesn't exist yet, wait a moment and try again.
+                setTimeout(addLayerWhenReady, 100);
+                return;
             }
-        }
-        return {
-            fontFamily: "'SamsungSharpSans', 'SamsungOne', system-ui, -apple-system, sans-serif",
-            fontWeight: 600, // Slightly bolder for SDIC
-            fontSize: `${fontSize}px`,
-            lineHeight: "1.2",
-            color: "rgba(255, 255, 255, 0.95)",
-            letterSpacing: "0.05em",
-            textShadow: "0 2px 4px rgba(0, 0, 0, 0.9)",
-            whiteSpace: "nowrap",
-            transition: "opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), font-size 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-            opacity: shouldShowSDICLabel ? 1 : 0,
-            transform: shouldShowSDICLabel ? "translate(-50%, -50%) scale(1)" : "translate(-50%, -50%) scale(0.8)",
-            pointerEvents: "none"
-        };
-    };
-    // const getSDICLabelStyle = () => {
-    //     let fontSize = "12px"; // Default size
-        
-    //     if (zoom >= 12 && zoom <= 13) {
-    //         // Bigger size for zoom 10-13
-    //         fontSize = zoom <= 11 ? "12px" : zoom <= 12 ? "14px" : "12px";
-    //     } else if (zoom > 13) {
-    //         // Normal size for zoom > 13
-    //         fontSize = "16px";
-    //     }
-        
-    //     return {
-    //         fontFamily: "'SamsungSharpSans', 'SamsungOne', system-ui, -apple-system, sans-serif",
-    //         fontWeight: 600, // Slightly bolder for SDIC
-    //         fontSize: fontSize,
-    //         lineHeight: "1.2",
-    //         color: "rgba(255, 255, 255, 0.95)",
-    //         letterSpacing: "0.05em",
-    //         textShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-    //         whiteSpace: "nowrap",
-    //         transition: "opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-    //         opacity: shouldShowSDICLabel ? 1 : 0,
-    //         transform: shouldShowSDICLabel ? "translate(-50%, -50%) scale(1)" : "translate(-50%, -50%) scale(0.8)",
-    //         pointerEvents: "none"
-    //     };
-    // };
+            console.log("Map layers: ", map.getStyle().layers.map(layer => layer.id))
+           
 
+            // If the layer already exists, don't add it again.
+            if (!map.getLayer(labelsLayerIdS)) {
+                map.addLayer({
+                    id: labelsLayerIdS,
+                    type: "symbol",
+                    source: sourceIdEnd, // Use the provided source
+                    minzoom: minZoomS,
+                    maxzoom: maxZoomS,
+                    layout: {
+                        // Use the 'location_name' property from the GeoJSON feature for the text
+                        "text-field": ["get", "location_name"],
+                        // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
+                        // We'll use a standard font available in most MapTiler styles for robustness.
+                        "text-font": ["Open Sans Regular"],
+                        "text-size": 11,
+                        "text-anchor": "top",
+                        "text-offset": [0, 0.8], // Offset the label slightly below the point
+                        "text-allow-overlap": false,
+                        "text-ignore-placement": false,
+                    },
+                    paint: {
+                        "text-color": "#ffffff",
+                        "text-halo-color": "rgba(0, 0, 0, 0.85)", // Adds a dark outline for readability
+                        "text-halo-width": 1,
+                        "text-halo-blur": 1,
+                    },
+                });
+            }
+
+            if (!map.getLayer(labelsLayerIdM)) {
+                map.addLayer({
+                    id: labelsLayerIdM,
+                    type: "symbol",
+                    source: sourceIdEnd, // Use the provided source
+                    minzoom: minZoomM,
+                    maxzoom: maxZoomM,
+                    layout: {
+                        // Use the 'location_name' property from the GeoJSON feature for the text
+                        "text-field": ["get", "location_name"],
+                        // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
+                        // We'll use a standard font available in most MapTiler styles for robustness.
+                        "text-font": ["Open Sans Regular"],
+                        "text-size": 12,
+                        "text-anchor": "top",
+                        "text-offset": [0, 0.8], // Offset the label slightly below the point
+                        "text-allow-overlap": false,
+                        "text-ignore-placement": false,
+                    },
+                    paint: {
+                        "text-color": "#ffffff",
+                        "text-halo-color": "rgba(0, 0, 0, 0.85)", // Adds a dark outline for readability
+                        "text-halo-width": 1,
+                        "text-halo-blur": 1,
+                    },
+                });
+            }
+
+
+
+            // Dynamic font for SDIC Label
+            let fontSizeL = 16
+            // if (typeof zoom === "number") {
+            //     if (zoom <= 12) fontSizeL = 14;
+            //     else if (zoom >= 13) fontSizeL = 16;
+            //     else fontSizeL = 12 + (zoom - 12) * (16 - 12);
+            // }
+
+            // Adding SDIC Label
+            if (!map.getLayer(labelsLayerIdOrigin)) {
+                map.addLayer({
+                    id: labelsLayerIdOrigin,
+                    type: "symbol",
+                    source: sourceIdOrigin, 
+                    minzoom: minZoomL,
+                    maxzoom: maxZoomL,
+                    layout: {
+                        "text-field": "SDIC",
+                        // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
+                        // We'll use a standard font available in most MapTiler styles for robustness.
+                        "text-font": ["Open Sans Regular"],
+                        "text-size": fontSizeL,
+                        "text-anchor": "top",
+                        "text-offset": [0, 0.0], // Offset the label slightly below the point
+                        "text-allow-overlap": false,
+                        "text-ignore-placement": false,
+                    },
+                    paint: {
+                        "text-color": "#ffffff",
+                        "text-halo-color": "rgba(0, 0, 0, 0.85)", // Adds a dark outline for readability
+                        "text-halo-width": 1,
+                        "text-halo-blur": 1,
+                    },
+                });
+            }
+        };
+
+        addLayerWhenReady();
+
+        // Cleanup function to remove the layer when the component unmounts
+        return () => {
+            if (map.getLayer(labelsLayerIdS)) {
+                map.removeLayer(labelsLayerIdS);
+            }
+            if (map.getLayer(labelsLayerIdM)) {
+                map.removeLayer(labelsLayerIdM);
+            }
+            if (map.getLayer(labelsLayerIdOrigin)) {
+                map.removeLayer(labelsLayerIdOrigin);
+            }
+        };
+    }, [map, sourceIdOrigin, sourceIdEnd, minZoomS, maxZoomS, minZoomM, maxZoomM, minZoomL, maxZoomL]);
+    
+    // Effect to manage the filter dynamically
+    useEffect(() => {
+        if (!map) return;
+
+        if (map.getLayer(labelsLayerIdM) && filterEvents) {
+            let filterExpression = null;
+            if (filterEvents && filterEvents.length > 0) {
+                // MapLibre filter: show feature if its 'activity' property is in our list
+                filterExpression = ["in", ["get", "activity"], ["literal", filterEvents]];
+            }
+            map.setFilter(labelsLayerIdM, filterExpression);
+        }
+    }, [map, filterEvents]);
+
+
+    // --- Logic for the separate SDIC label (which still uses the DOM) ---
     useEffect(() => {
         if (!map) return;
         setContainer(map.getContainer());
-        setZoom(map.getZoom());
-    }, [map]);
-
-    // Listen for zoom changes
-    useEffect(() => {
-        if (!map) return;
-
-        const onZoom = () => {
-            setZoom(map.getZoom());
-        };
-
-        map.on('zoom', onZoom);
-        map.on('zoomend', onZoom);
+        const updateZoom = () => setZoom(map.getZoom());
+        const updatePosition = () => setSdicPosition(map.project(SDIC_ORIGIN));
+        
+        map.on('zoom', updateZoom);
+        map.on('move', updatePosition);
+        
+        updateZoom();
+        updatePosition();
 
         return () => {
-            map.off('zoom', onZoom);
-            map.off('zoomend', onZoom);
+            map.off('zoom', updateZoom);
+            map.off('move', updatePosition);
         };
     }, [map]);
 
-    // Get all features from the specified layers
-    useEffect(() => {
-        if (!map || !layers?.length || !shouldShowLabels) {
-            setFeatures([]);
-            return;
-        }
+    // const getSDICLabelStyle = () => {
+    //     let fontSize = 12;
+    //     if (typeof zoom === "number") {
+    //         if (zoom <= 12) fontSize = 12;
+    //         else if (zoom >= 13) fontSize = 16;
+    //         else fontSize = 12 + (zoom - 12) * (16 - 12);
+    //     }
+    //     return {
+    //         position: "absolute",
+    //         left: sdicPosition ? sdicPosition.x : 0,
+    //         top: sdicPosition ? sdicPosition.y : 0,
+    //         fontFamily: "'SamsungSharpSans', 'SamsungOne', system-ui, sans-serif",
+    //         fontWeight: 600,
+    //         fontSize: `${fontSize}px`,
+    //         color: "rgba(255, 255, 255, 0.95)",
+    //         textShadow: "0 2px 4px rgba(0, 0, 0, 0.9)",
+    //         whiteSpace: "nowrap",
+    //         transform: "translate(-50%, -50%)",
+    //         transition: "opacity 0.6s, font-size 0.3s",
+    //         opacity: shouldShowSDICLabel ? 1 : 0,
+    //         pointerEvents: "none",
+    //     };
+    // };
 
-        const updateFeatures = () => {
-            try {
-                const allFeatures = [];
-                
-                // Get features from each layer
-                for (const layerId of layers) {
-                    if (map.getLayer(layerId)) {
-                        const layerFeatures = map.queryRenderedFeatures({ layers: [layerId] });
-                        allFeatures.push(...layerFeatures);
-                    }
-                }
-                
-                setFeatures(allFeatures);
-            } catch (error) {
-                console.warn('Error querying features:', error);
-                setFeatures([]);
-            }
-        };
+    // if (!container) return null;
 
-        // Update features when map moves or zooms
-        const onMove = () => updateFeatures();
-        const onZoomEnd = () => updateFeatures();
-
-        map.on('moveend', onMove);
-        map.on('zoomend', onZoomEnd);
-
-        // Initial update
-        updateFeatures();
-
-        return () => {
-            map.off('moveend', onMove);
-            map.off('zoomend', onZoomEnd);
-        };
-    }, [map, layers, shouldShowLabels]);
-
-    // Don't render if container unknown (but allow SDIC label even without features)
-    if (!container) return null;
-
-    return createPortal(
-        <div
-            className={className}
-            style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
-                zIndex: 2
-            }}
-        >
-            {/* SDIC Origin Label */}
-            {shouldShowSDICLabel && (
-                <div
-                    style={{
-                        position: "absolute",
-                        left: map.project(SDIC_ORIGIN).x,
-                        top: map.project(SDIC_ORIGIN).y,
-                        ...getSDICLabelStyle(),
-                        // Enhanced background for SDIC label
-                        // background: "rgba(0, 0, 0, 0.6)",
-                        textShadow: "0 2px 8px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)",
-                        // backdropFilter: "blur(10px)",
-                        // WebkitBackdropFilter: "blur(10px)",
-                        // borderRadius: "12px",
-                        // padding: "6px 12px",
-                        // border: "1px solid rgba(255, 255, 255, 0.2)",
-                        // boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)"
-                        // background: "rgba(0, 0, 0, 0.2)",
-                        // backdropFilter: "blur(8px)",
-                        // WebkitBackdropFilter: "blur(8px)",
-                        // borderRadius: "8px",
-                        // padding: "4px 8px",
-                        // border: "1px solid rgba(255, 255, 255, 0.1)",
-                        // boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)"
-                    }}
-                >
-                    SDIC
-                </div>
-            )}
-            
-            {features.map((feature, index) => {
-                if (!feature.geometry?.coordinates) return null;
-                
-                const [lng, lat] = Array.isArray(feature.geometry.coordinates) 
-                    ? feature.geometry.coordinates 
-                    : [];
-                
-                if (lng == null || lat == null) return null;
-
-                // Filter by events if filterEvents is provided
-                if (filterEvents && filterEvents.length > 0) {
-                    const activity = feature.properties?.activity;
-                    if (!activity || !filterEvents.includes(activity)) {
-                        return null; // Skip this feature if it doesn't match the filter
-                    }
-                }
-
-                // Convert coordinates to pixel position
-                const point = map.project([lng, lat]);
-                
-
-                // Get location name from properties - only use location_name
-                // const locationName = feature.properties?.name || 
-                // feature.properties?.location || 
-                // feature.properties?.address ||
-                // feature.properties?.label ||
-                // 'Unknown Location';
-                const locationName = feature.properties?.location_name || 'Unknown Location';
-
-                return (
-                    <div
-                        key={`${feature.layer?.id || 'unknown'}-${index}`}
-                        style={{
-                            position: "absolute",
-                            left: point.x,
-                            top: point.y,
-                            ...locationNameStyle,
-                            // Glassmorphism background for better readability
-                            background: "rgba(0, 0, 0, 0.2)",
-                            backdropFilter: "blur(8px)",
-                            WebkitBackdropFilter: "blur(8px)",
-                            borderRadius: "8px",
-                            padding: "4px 8px",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)"
-                        }}
-                    >
-                        {locationName}
-                    </div>
-                );
-            })}
-        </div>,
-        container
-    );
+    // We only create a portal for the single SDIC label.
+    // The event location labels are now handled entirely by MapLibre.
+    // return createPortal(
+    //     <>
+    //         {showOriginLabel && sdicPosition && (
+    //             // <div style={getSDICLabelStyle()}>
+    //             //     SDIC
+    //             // </div>
+    //         )}
+    //     </>,
+    //     container
+    // );
 }

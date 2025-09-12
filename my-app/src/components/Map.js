@@ -3,12 +3,12 @@
 import maplibregl from 'maplibre-gl';
 import React, { useEffect, useRef, useState } from 'react';
 import RouteLayer, { COLOR_MODES } from './RouteLayer';
+import TripsOverlaySeries, { TripsOverlayProvider } from './TripsOverlaySeries';
 
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
 import MapLocationLabels from "./MapLocationLabels";
-import TripsOverlaySeries from './TripsOverlaySeries';
 
 // [KEYFRAME ANIMATION]
 import { easingFunctions, useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
@@ -155,6 +155,8 @@ export default function Map() {
     const [API_KEY] = useState(MAPTILER_API_KEY);
     const [visualizationMode, setVisualizationMode] = useState("offset"); 
     const layerId = "saved-route-line";
+    const sourceId = "saved-route"; // The base sourceId used in RouteLayer
+
 
     const basePath = getBasePath();
     const routesUrl = `${basePath}/assets/routes/routes.geojson`;
@@ -343,12 +345,21 @@ export default function Map() {
                 <>
                     {/* camera stable by disabling fit; expose data upward */}
                     
-                    <RouteLayer map={map.current} url={routesUrl} onData={handleGeojson} fitOnLoad={false} showSmoothed={showSmoothed}  colorMode={colorMode}/>
+                    <RouteLayer 
+                        map={map.current} 
+                        url={routesUrl}
+                        onData={handleGeojson} 
+                        fitOnLoad={false} 
+                        showSmoothed={showSmoothed}  
+                        colorMode={colorMode}
+                        sourceId={sourceId}
+                        layerId={layerId}
+                    />
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
-                        <>
-                            <TripsOverlaySeries
-                                // ref={tripsOverlayRef}
+                           <TripsOverlayProvider map={map.current}>
+                                 <TripsOverlaySeries
+                                id={"trips-overlay1"}
                                 map={map.current}
                                 geoJSON={geoJSON}
                                 fps={30}
@@ -363,8 +374,9 @@ export default function Map() {
                                 colorMode = {"none"}
                             />
 
+
                             <TripsOverlaySeries
-                                // ref={tripsOverlayRef}
+                                id={"trips-overlay2"}
                                 map={map.current}
                                 geoJSON={geoJSON}
                                 fps={30}
@@ -377,8 +389,8 @@ export default function Map() {
                                 reset={resetTripsOverlay}
                                 onReset = {() =>{setResetTripsOverlay(false)}}
                                 colorMode = {"months"}
-                            />
-                        </>
+                            /> 
+   </TripsOverlayProvider>
                     )}
 
                     
@@ -395,9 +407,10 @@ export default function Map() {
                     {map.current && (
                         <MapLocationLabels
                             map={map.current}
-                            layers={[`${layerId}-endpoint-hit`]}
-                            minZoom={13}
-                            maxZoom={15}
+                            sourceIdOrigin={`${sourceId}-origin-point`}
+                            sourceIdEnd={`${sourceId}-endpoint-point`}
+                            minZoomM={13}
+                            maxZoomM={15}
                             showOriginLabel={true}
                             filterEvents={[
                                 "Built on Bedrock Demo Night",

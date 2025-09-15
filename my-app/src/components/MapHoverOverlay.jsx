@@ -44,7 +44,6 @@ export default function MapHoverOverlay({
         if (!f) return null;
         const c = f.geometry?.coordinates;
         const color = hexToRGB(CLASS_PALETTE[f.properties.class])
-        console.log("TEST", color, f.properties.class)
 
         const [lng, lat] = Array.isArray(c) ? c : [];
         return (

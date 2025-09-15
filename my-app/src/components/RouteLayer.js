@@ -488,7 +488,6 @@ export default function RouteLayer({
             const origProps = originalFC?.features?.[i]?.properties || {};
             const idxProps  = feat?.properties || {};
             const props     = Object.keys(origProps).length ? origProps : idxProps;
-
             const HEX = getFeatureColor(props, colorBy, END_COLOR);
             const color = hexToRGB(HEX)
 
@@ -686,17 +685,16 @@ export default function RouteLayer({
                     const rowByLoc = csvRows?.find?.((r) => norm(r.location_name) === norm(locStr));
 
                     const row = rowByIdx || rowByTo || rowByLoc || null;
-
                     const props = {
-                    endpointIndex: i,
-                    // prefer CSV, then original src props, then empty string
-                    month:        row?.month        ?? srcProps.month        ?? "",
-                    team:         row?.team         ?? srcProps.team         ?? "",
-                    class:        row?.class        ?? srcProps.class        ?? "",   // keep empty if none
-                    location_name:row?.location_name?? srcProps.location_name?? "",
-                    address:      row?.to           ?? toStr,                // "address" = CSV `to` or original `to`
-                    activity:     row?.activity     ?? srcProps.activity     ?? "",
-                    profile:      row?.profile      ?? srcProps.profile      ?? "",
+                        endpointIndex: i,
+                        // prefer CSV, then original src props, then empty string
+                        month:        row?.month        ?? srcProps.month        ?? "",
+                        team:         row?.team         ?? srcProps.team         ?? "",
+                        class:        row?.class        ?? srcProps.class        ?? "",   // keep empty if none
+                        location_name:row?.location_name?? srcProps.location_name?? "",
+                        address:      row?.to           ?? toStr,                // "address" = CSV `to` or original `to`
+                        activity:     row?.activity     ?? srcProps.activity     ?? "",
+                        profile:      row?.profile      ?? srcProps.profile      ?? "",
                     };
 
                     return {

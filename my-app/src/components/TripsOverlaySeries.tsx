@@ -12,7 +12,7 @@ export type TripDatum = {
   color?: [number, number, number];
 };
 
-type colorModeProp = "usePathColor" | "none" | "team" | "month"
+type colorModeProp = "usePathColor" | "none" | "class" | "months"
 
 export type Props = {
   id: string;
@@ -424,7 +424,7 @@ export default function TripsOverlaySeries({
       if (trip) {
         const vApprox = approxSpeedFromTrip(trip, t);
         if (vApprox != null && Number.isFinite(vApprox)) {
-          // console.log(`${id} t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
+          console.log(`${id} t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
         }
       }
 

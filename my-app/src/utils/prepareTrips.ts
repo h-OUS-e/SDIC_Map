@@ -1,6 +1,5 @@
 import { data } from "@maptiler/sdk/dist/src";
 import type * as GeoJSON from "geojson";
-import { COLOR_MODES, MONTH_PALETTE, TEAM_PALETTE } from '../components/RouteLayer';
 
 
 export type TripDatum = {
@@ -9,6 +8,7 @@ export type TripDatum = {
   color?: [number, number, number]
   team?: string
   month?: string
+  class?: string
   from?: string
   to?: string
 }
@@ -22,6 +22,7 @@ export interface RouteProps {
   profile: "driving" | "cycling" | "walking"
   team?: string
   month?: string
+  class?: string
   color?: [number, number, number]
 }
 
@@ -223,6 +224,7 @@ export function toTripsData(fc: FC, timeSpeedProfile: { speeds: number[]; dt?: n
       color: p.color, // Single color for all trips
       team: p.team,
       month: p.month,
+      class: p.class,
       from: p.from,
       to: p.to,
     }

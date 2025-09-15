@@ -359,38 +359,55 @@ export default function Map() {
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
                            <TripsOverlayProvider map={map.current}>
                                  <TripsOverlaySeries
-                                id={"trips-overlay1"}
-                                map={map.current}
-                                geoJSON={geoJSON}
-                                fps={30}
-                                trail={900}
-                                opacity={.3}
-                                lineWidth={1.5}
-                                // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
-                                playState={status}
-                                reset={resetTripsOverlay}
-                                onReset = {() =>{setResetTripsOverlay(false)}}
-                                colorMode = {"class"}
-                            />
+                                    id={"trips-overlay1"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={900}
+                                    opacity={.3}
+                                    lineWidth={1.5}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 8.5, 6, 6] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"none"}
+                                />
 
-{/* 
-                            <TripsOverlaySeries
-                                id={"trips-overlay2"}
-                                map={map.current}
-                                geoJSON={geoJSON}
-                                fps={30}
-                                trail={2}
-                                opacity={.6}
-                                lineWidth={1.5}
-                                // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                timeSpeedProfile={{ speeds: [0, 100, 20000, 100], dts: [16.2, 7, .1] }}
-                                playState={status}
-                                reset={resetTripsOverlay}
-                                onReset = {() =>{setResetTripsOverlay(false)}}
-                                colorMode = {"class"}
-                            />  */}
-   </TripsOverlayProvider>
+    
+                                <TripsOverlaySeries
+                                    id={"trips-overlay2"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={7}
+                                    opacity={.6}
+                                    lineWidth={1.5}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [16.2, 3, 1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                />  
+
+                                <TripsOverlaySeries
+                                    id={"trips-overlay3"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={3}
+                                    opacity={1}
+                                    lineWidth={2}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [18.8, 3, 1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                />  
+                                
+                        </TripsOverlayProvider>
                     )}
 
                     

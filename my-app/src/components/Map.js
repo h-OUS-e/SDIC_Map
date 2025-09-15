@@ -9,6 +9,7 @@ import TripsOverlaySeries, { TripsOverlayProvider } from './TripsOverlaySeries';
 // import { toTripsData } from '../utils/prepareTrips';
 import MapHoverOverlay from "./MapHoverOverlay";
 import MapLocationLabels from "./MapLocationLabels";
+import BillboardLayer from "./BillboardLayer";
 
 // [KEYFRAME ANIMATION]
 import { easingFunctions, useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
@@ -138,6 +139,40 @@ const keyframes = [
     initialView, sfView1, sfView2, sfView3, bayAreaView, bayAreaViewPause,
      billboard1, billboard3, 
     lastView,
+];
+
+// Billboard data with your specified coordinates
+const billboardData = [
+    {
+        id: "billboard-1",
+        coordinates: [-122.40493, 37.64193],
+        name: "Billboard 1",
+        imageUrl: "/billboards/b1.jpg" // Local image
+    },
+    {
+        id: "billboard-2", 
+        coordinates: [-122.41014, 37.65219],
+        name: "Billboard 2",
+        imageUrl: "/billboards/b2.jpg" // Local image
+    },
+    {
+        id: "billboard-3",
+        coordinates: [-122.39128, 37.67396], 
+        name: "Billboard 3",
+        imageUrl: "/billboards/b3.jpg" // Local image
+    },
+    {
+        id: "billboard-4",
+        coordinates: [-122.42230, 37.71933],
+        name: "Billboard 4", 
+        imageUrl: "/billboards/b4.jpg" // Local image
+    },
+    {
+        id: "billboard-5",
+        coordinates: [-122.44058, 37.67395],
+        name: "Billboard 5",
+        imageUrl: "/billboards/b5.jpg" // Local image
+    }
 ];
 
 
@@ -430,6 +465,16 @@ export default function Map() {
                                 "Phone a (AI) Friend with Anthropic",
                                 "Robotics Club SF: Simulation as a Service"
                             ]}
+                        />
+                    )}
+
+                    {/* Billboard Layer — show billboard images at specific coordinates */}
+                    {map.current && (
+                        <BillboardLayer
+                            map={map.current}
+                            billboardData={billboardData}
+                            minZoom={12}
+                            maxZoom={18}
                         />
                     )}
                 </>                 

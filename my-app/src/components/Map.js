@@ -217,7 +217,7 @@ const billboardData = [
     },
     {
         id: "billboard-13",
-        coordinates: [-122.40619, 37.76248],
+        coordinates: [-122.40742, 37.76454],
         name: "Billboard 13",
         imageUrl: "/billboards/b13.jpg" 
     },
@@ -227,6 +227,51 @@ const billboardData = [
         name: "Billboard 14",
         imageUrl: "/billboards/b14.jpg" 
     },
+    {
+        id: "billboard-15",
+        coordinates: [-122.39532, 37.66450],
+        name: "Billboard 15",
+        imageUrl: "/billboards/b15.jpg" 
+    },
+    {
+        id: "billboard-17",
+        coordinates: [-122.40548, 37.76747],
+        name: "Billboard 17",
+        imageUrl: "/billboards/b17.jpg" 
+    },
+    {
+        id: "billboard-18",
+        coordinates: [-122.40141, 37.72321],
+        name: "Billboard 18",
+        imageUrl: "/billboards/b18.jpg" 
+    },
+    {
+        id: "billboard-19",
+        coordinates: [-122.40834, 37.73743],
+        name: "Billboard 19",
+        imageUrl: "/billboards/b19.jpg" 
+    },
+    {
+        id: "billboard-20",
+        coordinates: [-122.40429, 37.75307],
+        name: "Billboard 20",
+        imageUrl: "/billboards/b20.jpg" 
+    },
+    {
+        id: "billboard-21",
+        coordinates: [-122.40388, 37.74683],
+        name: "Billboard 21",
+        imageUrl: "/billboards/b21.jpg" 
+    },
+    {
+        id: "billboard-22",
+        coordinates: [-122.42828, 37.76771],
+        name: "Billboard 22",
+        imageUrl: "/billboards/b22.jpg" 
+    },
+
+    // lng: -122.40834, lat: 37.73743
+
 ];
 
 

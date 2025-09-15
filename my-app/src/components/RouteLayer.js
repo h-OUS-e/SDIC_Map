@@ -31,7 +31,7 @@ const inner_tail_t = 5500;
 const showVertices = false;
 const showGradientVertices = false;
 
-export const COLOR_MODES = { NONE: "none", TEAM: "team", MONTH: "month" };
+export const COLOR_MODES = { NONE: "none", CLASS: "class", MONTH: "month" };
 
 export const MONTH_PALETTE = {
   January:"#2563eb", February:"#ef4444", March:"#10b981", April:"#f59e0b",
@@ -39,10 +39,20 @@ export const MONTH_PALETTE = {
   September:"#a855f7", October:"#eab308", November:"#3b82f6", December:"#d946ef"
 };
 
-export const TEAM_PALETTE = {
-  "Ambient/MX Devices": "#06b6d4",
-  // ...add known teams here if you want specific colors
+// Represets colo r code for different event types
+export const CLASS_PALETTE = {
+  "tech_meetups": "#2D9CDB", // Energetic tech blue
+  "tech_summit": "#1B4965", // Deep professional teal
+  "startup_pitches": "#00BFA6", // Bold hopeful teal
+  "design_events": "#FF6F91", // Creative coral pink
+  "art_exhibit": "#9B5DE5", // Imaginative purple
+  "academic_conferences": "#2E7D32", // Scholarly green
+  "networking_dinner": "#C6A700", // Formal golden mustard
+  "local_protests": "#D32F2F",  // Strong activist red
+  "gamer_meetups": "#00C853",  // Neon gamer green
+  "comedy_shows": "#FFB300",  // Fun playful yellow-orange
 };
+
 
 export const stringToColor = (s) => {
   let h = 0; for (let i = 0; i < String(s).length; i++) h = (h*31 + s.charCodeAt(i)) % 360;
@@ -66,16 +76,16 @@ export function hexToRGB(hex) {
 
 
 // Build a Mapbox expression like: ["match", ["get", prop], "Team A", "#...", "Team B", "#...", END_COLOR]
-function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETTE, monthPalette = MONTH_PALETTE) {
+function buildColorExpr(features, mode, fallbackColor, classPalette = CLASS_PALETTE, monthPalette = MONTH_PALETTE) {
   if (mode === COLOR_MODES.NONE) return fallbackColor;
 
-  const prop = mode === COLOR_MODES.TEAM ? "team" : "month";
+  const prop = mode === COLOR_MODES.CLASS ? "class" : "month";
   const domain = Array.from(new Set(features.map(f => f?.properties?.[prop]).filter(Boolean)));
 
   const pairs = [];
   domain.forEach(v => {
     let c = fallbackColor;
-    if (mode === COLOR_MODES.TEAM) c = teamPalette[v] || stringToColor(v);
+    if (mode === COLOR_MODES.CLASS) c = classPalette[v] || stringToColor(v);
     else                           c = monthPalette[v] || stringToColor(v);
     pairs.push(v, c);
   });
@@ -87,10 +97,10 @@ function buildColorExpr(features, mode, fallbackColor, teamPalette = TEAM_PALETT
 
 export const getFeatureColor = (props, colorBy, fallback) => {
   if (colorBy === COLOR_MODES.NONE) {console.log("returning"); return fallback};
-  const key = colorBy === COLOR_MODES.TEAM ? props?.team : props?.month;
+  const key = colorBy === COLOR_MODES.CLASS ? props?.class : props?.month;
   if (!key) return fallback;
-  return colorBy === COLOR_MODES.TEAM
-    ? (TEAM_PALETTE[key] || stringToColor(key))
+  return colorBy === COLOR_MODES.CLASS
+    ? (CLASS_PALETTE[key] || stringToColor(key))
     : (MONTH_PALETTE[key] || stringToColor(key));
 };
 

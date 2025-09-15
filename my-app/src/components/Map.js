@@ -169,7 +169,7 @@ export default function Map() {
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-    const [colorMode, setColorMode] = useState(COLOR_MODES.MONTH);
+    const [colorMode, setColorMode] = useState(COLOR_MODES.CLASS);
 
     // route data
     const [geoJSON, setGeoJSON] = useState([]);
@@ -371,10 +371,10 @@ export default function Map() {
                                 playState={status}
                                 reset={resetTripsOverlay}
                                 onReset = {() =>{setResetTripsOverlay(false)}}
-                                colorMode = {"none"}
+                                colorMode = {"class"}
                             />
 
-
+{/* 
                             <TripsOverlaySeries
                                 id={"trips-overlay2"}
                                 map={map.current}
@@ -384,12 +384,12 @@ export default function Map() {
                                 opacity={.6}
                                 lineWidth={1.5}
                                 // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                timeSpeedProfile={{ speeds: [0, 0, 20000, 100], dts: [16.2, 7, .1] }}
+                                timeSpeedProfile={{ speeds: [0, 100, 20000, 100], dts: [16.2, 7, .1] }}
                                 playState={status}
                                 reset={resetTripsOverlay}
                                 onReset = {() =>{setResetTripsOverlay(false)}}
-                                colorMode = {"months"}
-                            /> 
+                                colorMode = {"class"}
+                            />  */}
    </TripsOverlayProvider>
                     )}
 

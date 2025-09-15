@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { COLOR_MODES, hexToRGB, MONTH_PALETTE, TEAM_PALETTE } from './RouteLayer';
+import { CLASS_PALETTE, COLOR_MODES, hexToRGB, MONTH_PALETTE } from './RouteLayer';
 
 /**
      * Props:
@@ -43,8 +43,8 @@ export default function MapHoverOverlay({
     const defaultRender = (f) => {
         if (!f) return null;
         const c = f.geometry?.coordinates;
-        const color = hexToRGB(MONTH_PALETTE[f.properties.month])
-        console.log("TEST", color, f.properties.month)
+        const color = hexToRGB(CLASS_PALETTE[f.properties.class])
+        console.log("TEST", color, f.properties.class)
 
         const [lng, lat] = Array.isArray(c) ? c : [];
         return (
@@ -216,8 +216,8 @@ export default function MapHoverOverlay({
 
         // pick source for the color:
         // 1) by month 
-        const month = feats[0]?.properties?.month;
-        const hex = month != null ? MONTH_PALETTE[month] : null;
+        const class_name = feats[0]?.properties?.class;
+        const hex = class_name != null ? CLASS_PALETTE[class_name] : null;
 
         // fallback by team:
         // const team = feats[0]?.properties?.team;
@@ -277,7 +277,7 @@ export default function MapHoverOverlay({
                 position: "relative",
                 // Base card visuals
                 background: panelTheme?.gradient || panelTheme?.bg || "rgba(255, 255, 255, 0.23)",
-                backdropFilter: "blur(15px)",
+                backdropFilter: "blur(9px)",
                 WebkitBackdropFilter: "blur(15px)",
                 borderRadius: "16px",
                 padding: "22px 16px 12px 26px",
@@ -303,25 +303,29 @@ export default function MapHoverOverlay({
                 const translate = (i + 1) * stackFanOffset; // px
                 const rotate = 0 //(i % 2 === 0 ? -1 : 1) * Math.min(1 + i * 0.2, 3); // subtle wobble
                 const opacity = 0.3 + (i / visibleFeats.length) * 0.05; // more opaque near top
+
+                // derive base color from feature
+                const className = f?.properties?.class;
+                const hex = className != null ? CLASS_PALETTE[className] : null;
+                const rgb = hex ? hexToRGB(hex) : [255, 255, 255];
+                const [r, g, b] = Array.isArray(rgb) ? rgb : [rgb.r, rgb.g, rgb.b];
+
                 return (
-                <div
-                    key={`bg-${i}`}
-                    style={{
-                    position: "absolute",
-                    inset: 0,
-                    transform: `translate(${-translate * 0.6}px, ${
-                        translate * 0.6
-                    }px) rotate(${rotate}deg)`,
-                    borderRadius: "16px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(155, 155, 155, 0.99)",
-                    boxShadow:
-                        "0 6px 20px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.18)",
-                    opacity,
-                    pointerEvents: "none",
-                    zIndex: -i, // lower zIndex than the main content
-                    }}
-                />
+                    <div
+                        key={`bg-${i}`}
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            transform: `translate(${-translate * 0.6}px, ${translate * 0.6}px) rotate(${rotate}deg)`,
+                            borderRadius: "16px",
+                            background: `rgba(${r}, ${g}, ${b}, 0.05)`,   // <-- background tint
+                            border: `2px solid rgba(${r}, ${g}, ${b}, 0.99)`, // <-- border tint
+                            boxShadow: "0 6px 20px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.18)",
+                            opacity,
+                            pointerEvents: "none",
+                            zIndex: -i,
+                        }}
+                    />
                 );
             })}
 

@@ -189,9 +189,9 @@ export default function BillboardLayer({
                         "interpolate",
                         ["linear"],
                         ["zoom"],
-                        minZoom, 0.4,  // Bigger at min zoom
-                        15, 0.6,       // Medium size at zoom 15
-                        maxZoom, 0.8   // Larger at max zoom
+                        minZoom, 0.5,  // Bigger at min zoom
+                        15, 0.7,       // Medium size at zoom 15
+                        maxZoom, 0.9   // Larger at max zoom
                     ],
                     "icon-anchor": "bottom",
                     "icon-allow-overlap": true,
@@ -207,10 +207,32 @@ export default function BillboardLayer({
                     "text-allow-overlap": false,
                 },
                 paint: {
+                    "icon-opacity": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        minZoom - 2, 0,      // Start fading earlier
+                        minZoom - 0.5, 0.3,  // Partial fade
+                        minZoom, 1,          // Full opacity at min zoom
+                        maxZoom, 1,          // Stay visible at max zoom
+                        maxZoom + 0.5, 0.3,  // Start fading out
+                        maxZoom + 2, 0       // Complete fade out
+                    ],
                     "text-color": "#ffffff",
                     "text-halo-color": "rgba(0, 0, 0, 0.85)",
                     "text-halo-width": 1,
                     "text-halo-blur": 1,
+                    "text-opacity": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        minZoom - 2, 0,      // Start fading earlier
+                        minZoom - 0.5, 0.3,  // Partial fade
+                        minZoom, 1,          // Full opacity at min zoom
+                        maxZoom, 1,          // Stay visible at max zoom
+                        maxZoom + 0.5, 0.3,  // Start fading out
+                        maxZoom + 2, 0       // Complete fade out
+                    ],
                 },
             });
         }

@@ -20,6 +20,7 @@ export default function KeyframeControls({
   showSmoothed = true,
   onToggleSmoothed = () => {},
   viewInfo = null,
+  clickedCoordinates = null,
   setColorMode = () => {},
   colorMode = COLOR_MODES.NONE, 
 
@@ -426,6 +427,28 @@ export default function KeyframeControls({
         </>
         
       )}
+
+      {/* Clicked Coordinates Helper */}
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: "1px solid rgba(255,255,255,0.12)",
+        }}
+      >
+        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>
+          Click Coordinates
+        </div>
+        {clickedCoordinates ? (
+          <div style={chipRow}>
+            <span style={chip}>lng: {clickedCoordinates.lng.toFixed(5)}, lat: {clickedCoordinates.lat.toFixed(5)}</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, opacity: 0.6, fontStyle: 'italic' }}>
+            Click anywhere on the map to see coordinates
+          </div>
+        )}
+      </div>
 
     </div>
   );

@@ -207,6 +207,9 @@ export default function Map() {
         zoom: 12,
     });
 
+    // clicked coordinates for helper function
+    const [clickedCoordinates, setClickedCoordinates] = useState(null);
+
     // Define the two camera view configurations
     const sfView = {
         center: [-122.43609, 37.77169], // San Francisco
@@ -246,6 +249,13 @@ export default function Map() {
         // When the map's style has loaded, set our state to true
         map.current.on('load', () => {
             setIsMapLoaded(true);
+        });
+
+        // Add click event listener to capture coordinates
+        map.current.on('click', (e) => {
+            const { lng, lat } = e.lngLat;
+            setClickedCoordinates({ lng, lat });
+            console.log(`Clicked coordinates: lng=${lng.toFixed(5)}, lat=${lat.toFixed(5)}`);
         });
 
         return () => {
@@ -335,6 +345,7 @@ export default function Map() {
                     onToggleSmoothed={toggleSmoothed}
                     showSmoothed={showSmoothed}
                     viewInfo={viewInfo}
+                    clickedCoordinates={clickedCoordinates}
                     setColorMode={setColorMode}
                 />
             )}

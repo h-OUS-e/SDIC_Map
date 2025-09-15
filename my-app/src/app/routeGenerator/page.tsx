@@ -2,7 +2,8 @@
 
 import Papa from "papaparse";
 import React, { useMemo, useState } from "react";
-const GOOGLE_MAPS_KEY = process.env.GOOGLE_API_KEY;// ---- Types
+const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;// ---- Types
+
 interface Coord {
   lon: number;
   lat: number;

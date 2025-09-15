@@ -61,7 +61,7 @@ function preprocessBillboardImage(img) {
 export default function BillboardLayer({
     map,
     billboardData = [],
-    minZoom = 12,
+    minZoom = 13,
     maxZoom = 18,
 }) {
     const billboardSourceId = "billboard-source";

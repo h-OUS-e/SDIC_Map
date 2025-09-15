@@ -141,7 +141,7 @@ const keyframes = [
     lastView,
 ];
 
-// Billboard data with your specified coordinates
+// Billboard data with the coordinates picked
 const billboardData = [
     {
         id: "billboard-1",
@@ -172,7 +172,61 @@ const billboardData = [
         coordinates: [-122.44058, 37.67395],
         name: "Billboard 5",
         imageUrl: "/billboards/b5.jpg" // Local image
-    }
+    },
+    {
+        id: "billboard-6",
+        coordinates: [-122.39379, 37.70915],
+        name: "Billboard 6",
+        imageUrl: "/billboards/b6.jpg" 
+    },
+    {
+        id: "billboard-7",
+        coordinates: [-122.40760, 37.66095],
+        name: "Billboard 7",
+        imageUrl: "/billboards/b7.jpg" 
+    },
+    {
+        id: "billboard-8",
+        coordinates: [-122.41163, 37.67993],
+        name: "Billboard 8",
+        imageUrl: "/billboards/b8.jpg" 
+    },
+    {
+        id: "billboard-9",
+        coordinates: [-122.43926, 37.69813],
+        name: "Billboard 9",
+        imageUrl: "/billboards/b9.jpg" 
+    },
+    {
+        id: "billboard-10",
+        coordinates: [-122.40001, 37.69972],
+        name: "Billboard 10",
+        imageUrl: "/billboards/b10.jpg" 
+    },
+    {
+        id: "billboard-11",
+        coordinates: [-122.40699, 37.76111],
+        name: "Billboard 11",
+        imageUrl: "/billboards/b11.jpg" 
+    },
+    {
+        id: "billboard-12",
+        coordinates: [-122.40473, 37.76223],
+        name: "Billboard 12",
+        imageUrl: "/billboards/b12.jpg" 
+    },
+    {
+        id: "billboard-13",
+        coordinates: [-122.40619, 37.76248],
+        name: "Billboard 13",
+        imageUrl: "/billboards/b13.jpg" 
+    },
+    {
+        id: "billboard-14",
+        coordinates: [-122.41157, 37.76533 ],
+        name: "Billboard 14",
+        imageUrl: "/billboards/b14.jpg" 
+    },
 ];
 
 

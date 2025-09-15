@@ -4,12 +4,20 @@ import { Layer, LayersList } from "deck.gl";
 import type maplibregl from "maplibre-gl";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
-import { COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
+import { CLASS_MODES, COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
+
+
+
+// Getting a list of classes from CLASS_MODES
+export type TripClass = typeof CLASS_MODES[keyof typeof CLASS_MODES];
+export const CLASS_LIST: TripClass[] = Object.values(CLASS_MODES);
+
 
 export type TripDatum = {
   path: [number, number][];
   timestamps: number[];
   color?: [number, number, number];
+  class?: TripClass[];
 };
 
 type colorModeProp = "usePathColor" | "none" | "class" | "months"
@@ -36,6 +44,7 @@ export type Props = {
   reset: boolean; 
   colorMode: colorModeProp;
   onReset: ()=>void;
+  classFilters?: TripClass[][]; // e.g. ["bus","tram"]
 };
 
 // Context type definition
@@ -46,6 +55,16 @@ type TripsOverlayContextType = {
   isReady: boolean;
   map: maplibregl.Map | null;
 };
+
+function matchesClassFilters(classes: string[] | undefined, filters?: string[]): boolean {
+
+  if (!filters || filters.length === 0) return true;           // no filters → show all
+  if (!classes || classes.length === 0) return false;          // trip has no classes → hide
+  // Trip must contain at least one of the filter classes
+  return filters.some(cls => classes.includes(cls));
+}
+
+
 
 // Create the context
 export const TripsOverlayContext = createContext<TripsOverlayContextType | null>(null);
@@ -156,7 +175,8 @@ export default function TripsOverlaySeries({
   playState = 'playing',
   reset,
   onReset,
-  colorMode = "none"
+  colorMode = "none",
+  classFilters,
 }: Props) {
   // Get the shared context
   const context = useContext(TripsOverlayContext);
@@ -176,8 +196,13 @@ export default function TripsOverlaySeries({
   // Prepare geoJSON with timestamps
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
+  const filteredData = useMemo(
+    () => data.filter(d => matchesClassFilters(d.class, classFilters)),
+    [data, classFilters]
+  );
+
   // Layer data
-  const layerData = useMemo(() => data, [data]);
+  const layerData = useMemo(() => filteredData, [filteredData]);
 
   // Global max timestamp
   const maxTs = useMemo(() => getMaxTimestamp(layerData), [layerData]);
@@ -269,6 +294,7 @@ export default function TripsOverlaySeries({
   }, [timeSpeedProfile]);
 
   // Create layer factory function
+  
   const createLayer = (nowS: number) => {
     return new TripsLayer<TripDatum>({
       id: id,
@@ -296,6 +322,8 @@ export default function TripsOverlaySeries({
     });
   };
 
+  useEffect(() => {
+}, [data, filteredData, classFilters]);
   // Register this layer with the context (or create own overlay if no context)
   useEffect(() => {
     if (context?.isReady) {

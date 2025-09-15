@@ -2,14 +2,14 @@
 
 import maplibregl from 'maplibre-gl';
 import React, { useEffect, useRef, useState } from 'react';
-import RouteLayer, { COLOR_MODES } from './RouteLayer';
+import RouteLayer, { CLASS_MODES, COLOR_MODES } from './RouteLayer';
 import TripsOverlaySeries, { TripsOverlayProvider } from './TripsOverlaySeries';
 
 // [TRIPS ADD]
 // import { toTripsData } from '../utils/prepareTrips';
+import BillboardLayer from "./BillboardLayer";
 import MapHoverOverlay from "./MapHoverOverlay";
 import MapLocationLabels from "./MapLocationLabels";
-import BillboardLayer from "./BillboardLayer";
 
 // [KEYFRAME ANIMATION]
 import { easingFunctions, useKeyframeAnimation } from '../hooks/useKeyframeAnimation';
@@ -17,6 +17,7 @@ import KeyframeControls from './KeyframeControls';
 
 const MAPTILER_API_KEY = "ZAMOU7NPssEmiSXsELqD";
 const isAutoStart = true;
+
 
 
 // Build your keyframes (same views you had, just as a list):
@@ -49,7 +50,7 @@ const sfView3 = {
     zoom: 13.5,
     bearing: 60,
     pitch: 25,
-    duration: 5000,
+    duration: 12000,
     easing: easingFunctions.easeInOut,
 };
 const bayAreaView = {
@@ -503,7 +504,7 @@ export default function Map() {
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
                            <TripsOverlayProvider map={map.current}>
-                                 <TripsOverlaySeries
+                                 {/* <TripsOverlaySeries
                                     id={"trips-overlay1"}
                                     map={map.current}
                                     geoJSON={geoJSON}
@@ -517,7 +518,7 @@ export default function Map() {
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"none"}
-                                />
+                                /> */}
 
     
                                 <TripsOverlaySeries
@@ -529,13 +530,14 @@ export default function Map() {
                                     opacity={.6}
                                     lineWidth={1.5}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [16.2, 3, 1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [15.2, 3, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
+                                    classFilters={[CLASS_MODES.academic_conferences, CLASS_MODES.tech_meetups]}
                                 />  
-
+{/* 
                                 <TripsOverlaySeries
                                     id={"trips-overlay3"}
                                     map={map.current}
@@ -545,12 +547,12 @@ export default function Map() {
                                     opacity={1}
                                     lineWidth={2}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [18.8, 3, 1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 15000, 10], dts: [17.8, 3, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                />  
+                                />   */}
                                 
                         </TripsOverlayProvider>
                     )}

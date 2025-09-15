@@ -53,6 +53,20 @@ export const CLASS_PALETTE = {
   "comedy_shows": "#FFB300",  // Fun playful yellow-orange
 };
 
+export const CLASS_MODES = {
+  "tech_meetups": "tech_meetups", // Energetic tech blue
+  "tech_summit": "tech_summit", // Deep professional teal
+  "startup_pitches": "startup_pitches", // Bold hopeful teal
+  "design_events": "design_events", // Creative coral pink
+  "art_exhibit": "art_exhibit", // Imaginative purple
+  "academic_conferences": "academic_conferences", // Scholarly green
+  "networking_dinner": "networking_dinner", // Formal golden mustard
+  "local_protests": "local_protests",  // Strong activist red
+  "gamer_meetups": "gamer_meetups",  // Neon gamer green
+  "comedy_shows": "comedy_shows",  // Fun playful yellow-orange
+};
+
+
 
 export const stringToColor = (s) => {
   let h = 0; for (let i = 0; i < String(s).length; i++) h = (h*31 + s.charCodeAt(i)) % 360;

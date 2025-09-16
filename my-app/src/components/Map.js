@@ -711,7 +711,7 @@ export default function Map() {
                         <BillboardLayer
                             map={map.current}
                             billboardData={billboardData}
-                            minZoom={12}
+                            minZoom={14}
                             maxZoom={18}
                         />
                     )}

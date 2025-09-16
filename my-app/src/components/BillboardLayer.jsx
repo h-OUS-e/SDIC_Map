@@ -187,11 +187,11 @@ export default function BillboardLayer({
                     "icon-image": ["get", "imageId"],
                     "icon-size": [
                         "interpolate",
-                        ["linear"],
+                        ["exponential", 1.8],
                         ["zoom"],
                         minZoom, 0.5,  // Bigger at min zoom
                         15, 0.7,       // Medium size at zoom 15
-                        maxZoom, 0.9   // Larger at max zoom
+                        maxZoom + 1 , 1 // Larger at max zoom
                     ],
                     "icon-anchor": "bottom",
                     "icon-allow-overlap": true,
@@ -201,7 +201,7 @@ export default function BillboardLayer({
                     // Optional: add text labels below the image
                     "text-field": ["get", "name"],
                     "text-font": ["Open Sans Regular"],
-                    "text-size": 10,
+                    "text-size": 0,
                     "text-anchor": "top",
                     "text-offset": [0, 0.2],
                     "text-allow-overlap": false,
@@ -209,14 +209,20 @@ export default function BillboardLayer({
                 paint: {
                     "icon-opacity": [
                         "interpolate",
-                        ["linear"],
+                        ["exponential", 1.2],
                         ["zoom"],
-                        minZoom - 2, 0,      // Start fading earlier
-                        minZoom - 0.5, 0.3,  // Partial fade
-                        minZoom, 1,          // Full opacity at min zoom
-                        maxZoom, 1,          // Stay visible at max zoom
-                        maxZoom + 0.5, 0.3,  // Start fading out
-                        maxZoom + 2, 0       // Complete fade out
+                        minZoom - 3, 0,      // Start fading much earlier
+                        minZoom - 1, 0.2,    
+                        minZoom - 0.3, 0.6, 
+                        minZoom, 1,          
+                        maxZoom - 0.5, 1,    
+                        maxZoom, 1,          
+                        maxZoom + 0.8, 0.9,  
+                        maxZoom + 1.5, 0.7,  
+                        maxZoom + 2.5, 0.4, 
+                        maxZoom + 3.5, 0.15, 
+                        maxZoom + 4.5, 0.03, 
+                        maxZoom + 6, 0       
                     ],
                     "text-color": "#ffffff",
                     "text-halo-color": "rgba(0, 0, 0, 0.85)",
@@ -224,14 +230,18 @@ export default function BillboardLayer({
                     "text-halo-blur": 1,
                     "text-opacity": [
                         "interpolate",
-                        ["linear"],
+                        ["exponential", 1.2],
                         ["zoom"],
-                        minZoom - 2, 0,      // Start fading earlier
-                        minZoom - 0.5, 0.3,  // Partial fade
-                        minZoom, 1,          // Full opacity at min zoom
-                        maxZoom, 1,          // Stay visible at max zoom
-                        maxZoom + 0.5, 0.3,  // Start fading out
-                        maxZoom + 2, 0       // Complete fade out
+                        minZoom - 2, 0,     
+                        minZoom - 0.5, 0.3,  
+                        minZoom, 1,          
+                        maxZoom, 1,          
+                        maxZoom + 0.5, 0.95, 
+                        maxZoom + 1, 0.8,    
+                        maxZoom + 2, 0.5,    
+                        maxZoom + 3, 0.2,    
+                        maxZoom + 4, 0.05,  
+                        maxZoom + 5, 0       
                     ],
                 },
             });

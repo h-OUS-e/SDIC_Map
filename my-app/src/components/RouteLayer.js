@@ -20,13 +20,13 @@ const DARK_GREEN = "#138B4F"
 // Parameters
 const CRAYON_WIDTH = 8
 const CRAYON_OPACITY = .2
-const START_COLOR = "#a8cbff";
-const MID_COLOR = SDIC_BLUE;
+const START_COLOR = "#98bffa";
+const MID_COLOR = "#3b59cc";
 export const END_COLOR = "#c0effc"; // 8b60f7
 const head_t = 100;
 const tail_t = 100;
-const inner_head_t = 1500;
-const inner_tail_t = 5500;
+const inner_head_t = 1000;
+const inner_tail_t = 2500;
 
 const showVertices = false;
 const showGradientVertices = false;

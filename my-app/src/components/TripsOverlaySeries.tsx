@@ -170,7 +170,7 @@ export default function TripsOverlaySeries({
   fps = 30,
   opacity = 0.6,
   loopDelay = 5, 
-  loop = true,
+  loop = false,
   timeSpeedProfile = null,
   playState = 'playing',
   reset,

@@ -495,7 +495,7 @@ export default function Map() {
                                     opacity={1}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [14.6, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [14.6, 2, 1,.1, 5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -513,7 +513,7 @@ export default function Map() {
                                     opacity={1}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [16, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [16, 2, 1,.1,5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -531,7 +531,7 @@ export default function Map() {
                                     opacity={1}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [17.4, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [17.4, 2, 1,.1,5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -549,7 +549,7 @@ export default function Map() {
                                     opacity={.7}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [18.8, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [18.8, 2, 1,.1,5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -566,7 +566,7 @@ export default function Map() {
                                     opacity={.7}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [20.2, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [20.2, 2, 1,.1,5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -583,7 +583,7 @@ export default function Map() {
                                     opacity={.7}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [21.6, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [21.6, 2, 1,.1, 5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -598,10 +598,10 @@ export default function Map() {
                                     geoJSON={geoJSON}
                                     fps={30}
                                     trail={2}
-                                    opacity={.7}
+                                    opacity={.1}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [23, 2, 1,.1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000,500000], dts: [23, 2, 1,.1,5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}

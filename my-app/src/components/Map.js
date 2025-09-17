@@ -2,6 +2,7 @@
 
 import maplibregl from 'maplibre-gl';
 import React, { useEffect, useRef, useState } from 'react';
+import map_style from '../app/style.json';
 import RouteLayer, { CLASS_MODES, COLOR_MODES } from './RouteLayer';
 import TripsOverlaySeries, { TripsOverlayProvider } from './TripsOverlaySeries';
 
@@ -336,7 +337,8 @@ export default function Map() {
         map.current = new maplibregl.Map({
             container: mapContainer.current,
             // style: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${API_KEY}`,
-            style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
+            // style: `https://api.maptiler.com/maps/019934cc-16f4-70e2-b59a-96734dcc38bf/style.json?key=pWuuKuOsL6jBB1Gt1ClK`,
+            style: map_style,
             center: initialState.center,
             zoom: initialState.zoom,
             maxPitch: 89,

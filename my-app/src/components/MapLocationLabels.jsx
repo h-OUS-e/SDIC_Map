@@ -59,7 +59,7 @@ export default function MapLocationLabels({
     maxZoomL = 18,
     minZoomM = 13,
     maxZoomM = 18,
-    minZoomS = 15,
+    minZoomS = 14.40,
     maxZoomS = 18,
     filterEvents = null,
     showOriginLabel = true,
@@ -102,10 +102,12 @@ export default function MapLocationLabels({
                     layout: {
                         // Use the 'location_name' property from the GeoJSON feature for the text
                         "text-field": ["get", "location_name"],
+
+                        "text-font": ["Samsung Sharp Sans Regular"],
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
-                        "text-font": ["SamsungOne 300"],
-                        "text-size": 11,
+                        // "text-font": ["SamsungOne 300"],
+                        "text-size": 9,
                         "text-anchor": "top",
                         "text-offset": [0, 0.8], // Offset the label slightly below the point
                         "text-allow-overlap": false,
@@ -132,7 +134,7 @@ export default function MapLocationLabels({
                         "text-field": ["get", "location_name"],
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
-                        "text-font": ["Open Sans Regular"],
+                        "text-font": ["Samsung Sharp Sans Medium"],
                         "text-size": 12,
                         "text-anchor": "top",
                         "text-offset": [0, 0.8], // Offset the label slightly below the point
@@ -170,7 +172,7 @@ export default function MapLocationLabels({
                         "text-field": "SDIC",
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
-                        "text-font": ["SamsungOne 600"],
+                        "text-font": ["Samsung Sharp Sans Bold"],
                         "text-size": ["interpolate", ["linear"], ["zoom"],12,14, 13,18, 14,21, 15,24],
                         "text-anchor": "top",
                         "text-offset": [0, 0.0], // Offset the label slightly below the point

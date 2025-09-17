@@ -309,12 +309,10 @@ export default function TripsOverlaySeries({
       getTimestamps: (d) => d.timestamps,
       getColor: (path, {index}) => {
         if (colorModeRef.current === "usePathColor") {
-          // console.log("TEST 2", path.color, DEFAULT_PATH_COLOR, id)
           return path.color ? path.color : DEFAULT_PATH_COLOR as [number, number, number, number];
         } 
         else if (colorModeRef.current === "none") {
           const color = hexToRGB(CLASS_PALETTE.none);
-          console.log("TEST 2", path.color, color, DEFAULT_PATH_COLOR, id)
           return color? color as [number, number, number, number] : DEFAULT_PATH_COLOR as [number, number, number, number];
         } else {
           const HEX = getFeatureColor(path, colorModeRef.current, END_COLOR);

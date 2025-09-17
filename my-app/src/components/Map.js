@@ -477,6 +477,7 @@ export default function Map() {
                                     trail={8}
                                     opacity={.3}
                                     lineWidth={1.5}
+                                    loopDelay={80}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
                                     timeSpeedProfile={{ speeds: [30, 50, 150, 60, 2000, 16000], dts: [3,2, 7.5, 1, 1] }}
                                     playState={status}
@@ -496,13 +497,13 @@ export default function Map() {
                                     trail={1.5}
                                     opacity={1}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [14.6, 2, 1,.1, 5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [14.6, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.design_events]}
+                                    classFilters={[CLASS_MODES.tech_meetups]}
                                 />  
 
                                 {/* Showing art exhibit events */}
@@ -514,13 +515,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={1}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [16, 2, 1,.1,5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [16, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.art_exhibit]}
+                                    classFilters={[CLASS_MODES.startup_pitches]}
                                 /> 
 
                                 {/* Showing art exhibit events */}
@@ -532,13 +533,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={1}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [17.4, 2, 1,.1,5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [17.4, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.academic_conferences]}
+                                    classFilters={[CLASS_MODES.design_events]}
                                 /> 
 
                                 {/* Showing Tech Events */}
@@ -550,13 +551,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={.7}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [18.8, 2, 1,.1,5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [18.8, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.tech_meetups]}
+                                    classFilters={[CLASS_MODES.networking_dinner, CLASS_MODES.local_protests, CLASS_MODES.gamer_meetups, CLASS_MODES.comedy_shows]}
                                 /> 
 
                                 <TripsOverlaySeries
@@ -567,13 +568,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={.7}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [20.2, 2, 1,.1,5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [20.2, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.startup_pitches]}
+                                    classFilters={[CLASS_MODES.academic_conferences]}
                                 /> 
 
                                 <TripsOverlaySeries
@@ -584,13 +585,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={.7}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000, 500000], dts: [21.6, 2, 1,.1, 5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [21.6, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.tech_summit]}
+                                    classFilters={[CLASS_MODES.art_exhibit]}
                                 /> 
 
                                 {/* Showing other niche events under the banner of "social and cultural" events */}
@@ -602,13 +603,13 @@ export default function Map() {
                                     trail={2}
                                     opacity={.1}
                                     lineWidth={4}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000,500000], dts: [23, 2, 1,.1,5] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 50000], dts: [23, 2, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.networking_dinner, CLASS_MODES.local_protests, CLASS_MODES.gamer_meetups, CLASS_MODES.comedy_shows]}
+                                    classFilters={[CLASS_MODES.tech_summit]}
                                 /> 
                                 {/* Showing all classes at once */}
                                 {/* <TripsOverlaySeries
@@ -636,7 +637,7 @@ export default function Map() {
                                     trail={1}
                                     opacity={.3}
                                     lineWidth={2}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    loopDelay={80}
                                     timeSpeedProfile={{ speeds: [0, 0, 25000, 5000], dts: [30, 6, 6] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
@@ -653,8 +654,8 @@ export default function Map() {
                                     trail={2}
                                     opacity={.5}
                                     lineWidth={2}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 50000, 10,50000], dts: [34, 4, 5,1] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 50000, 10], dts: [34, 4, 5] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -669,8 +670,8 @@ export default function Map() {
                                     trail={1}
                                     opacity={.5}
                                     lineWidth={8}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 10000, 5000], dts: [42, 1, 1] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 10000], dts: [42, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -685,8 +686,8 @@ export default function Map() {
                                     trail={1}
                                     opacity={.5}
                                     lineWidth={10}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 10000, 5000,50000], dts: [45, 1, 1,1] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 10000, 5000, 50000], dts: [45, 1, 1, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -699,10 +700,10 @@ export default function Map() {
                                     geoJSON={geoJSON}
                                     fps={30}
                                     trail={1}
-                                    opacity={.7}
+                                    opacity={.2}
                                     lineWidth={12}
-                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 10000, 4000,50000], dts: [48.4, 1, 2,1] }}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 10000, 4000, 500000], dts: [48.4, 1, 2, 1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}

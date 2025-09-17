@@ -171,7 +171,7 @@ export default function TripsOverlaySeries({
   fps = 30,
   opacity = 0.6,
   loopDelay = 5, 
-  loop = false,
+  loop = true,
   timeSpeedProfile = null,
   playState = 'playing',
   reset,
@@ -436,8 +436,13 @@ export default function TripsOverlaySeries({
         } else {
           const candidate = currentTimeRef.current + elapsedS;
           if (candidate >= maxTs && (loopDelay ?? 0) > 0) {
-            current = maxTs - 1e-6;
-            holdUntilRef.current = tMs + (loopDelay! * 1000);
+            // Allow currentTime to continue increasing until maxTs + trail
+            const endLimit = maxTs + trail + loopDelay;  // extend so tail can still render
+            current = Math.min(candidate, endLimit);
+            // Start loopDelay timer once we hit endLimit
+            if (candidate >= endLimit) {
+              holdUntilRef.current = tMs ;
+            }
           } else {
             current = candidate % maxTs;
           }

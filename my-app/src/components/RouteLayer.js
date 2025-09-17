@@ -19,7 +19,7 @@ const DARK_GREEN = "#138B4F"
 
 // Parameters
 const CRAYON_WIDTH = 4
-const CRAYON_OPACITY = .7
+const CRAYON_OPACITY = 1
 const START_COLOR = "#162357" //"#98bffa";
 const MID_COLOR = "#162357" // "#3b59cc";
 export const END_COLOR = "#162357"// "#c0effc";  8b60f7
@@ -51,6 +51,7 @@ export const CLASS_PALETTE = {
   "local_protests": "#D32F2F",  // Strong activist red
   "gamer_meetups": "#00C853",  // Neon gamer green
   "comedy_shows": "#FFB300",  // Fun playful yellow-orange
+  "none": "c0effc"
 };
 
 export const CLASS_MODES = {
@@ -64,6 +65,7 @@ export const CLASS_MODES = {
   "local_protests": "local_protests",  // Strong activist red
   "gamer_meetups": "gamer_meetups",  // Neon gamer green
   "comedy_shows": "comedy_shows",  // Fun playful yellow-orange
+  "none": "none"
 };
 
 

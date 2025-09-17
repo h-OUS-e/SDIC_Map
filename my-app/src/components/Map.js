@@ -93,42 +93,7 @@ const billboard3 = {
     duration: 8000,
     easing: easingFunctions.easeInOut,
 };
-const billboard3Pause = {...COLOR_MODES,
-    duration: 1600,
-};
-const billboard4 = {
-    center: [-122.27178, 37.52712],
-    zoom: 17.5,
-    bearing: -45,
-    pitch: 85,
-    duration: 4500,
-    easing: easingFunctions.easeInOut,
-};
-const billboard5 = {
-    center: [-122.39789, 37.62401],
-    zoom: 15.2,
-    bearing: -25,
-    pitch: 72,
-    duration: 7000,
-    easing: easingFunctions.easeInOut,
-};
-const billboard6 = {
-    center: [-122.41332, 37.62401],
-    zoom: 14.2,
-    bearing: -3,
-    pitch: 60,
-    duration: 17000,
-    easing: easingFunctions.linear,
-};
 
-const sfView = {
-    center: [-122.38279, 37.68716],
-    zoom: 12.5,
-    bearing: -0,
-    pitch: 0,
-    duration: 5000,
-    easing: easingFunctions.easeInOut,
-};
 
 const lastView = {
   ...bayAreaView,
@@ -300,15 +265,12 @@ export default function Map() {
     
     // State to track the current view (true = Bay Area, false = SF)
     const [isZoomedOut, setIsZoomedOut] = useState(false);
-
     // State to track if the map has finished loading
     const [isMapLoaded, setIsMapLoaded] = useState(false);
-
     const [colorMode, setColorMode] = useState(COLOR_MODES.CLASS);
-
+    const [nodeColorMode, setNodeColorMode] = useState(COLOR_MODES.None);
     // route data
     const [geoJSON, setGeoJSON] = useState([]);
-
     const [resetTripsOverlay, setResetTripsOverlay] = useState([false])
 
     // [KEYFRAME ANIMATION] Initialize keyframe animation system

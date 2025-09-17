@@ -4,7 +4,7 @@ import { Layer, LayersList } from "deck.gl";
 import type maplibregl from "maplibre-gl";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FC, haversineMeters, toTripsData, TripDatum } from "../utils/prepareTrips";
-import { CLASS_MODES, COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
+import { CLASS_MODES, CLASS_PALETTE, COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
 
 
 
@@ -146,7 +146,8 @@ export function TripsOverlayProvider({
 }
 
 // Helper functions
-const DEFAULT_PATH_COLOR = hexToRGB(END_COLOR);
+const DEFAULT_PATH_COLOR = hexToRGB(CLASS_PALETTE.none);
+console.log("TEST",DEFAULT_PATH_COLOR)
 
 function getMaxTimestamp(arr: TripDatum[]): number {
   let maxT = 0;
@@ -308,7 +309,13 @@ export default function TripsOverlaySeries({
       getTimestamps: (d) => d.timestamps,
       getColor: (path, {index}) => {
         if (colorModeRef.current === "usePathColor") {
+          // console.log("TEST 2", path.color, DEFAULT_PATH_COLOR, id)
           return path.color ? path.color : DEFAULT_PATH_COLOR as [number, number, number, number];
+        } 
+        else if (colorModeRef.current === "none") {
+          const color = hexToRGB(CLASS_PALETTE.none);
+          console.log("TEST 2", path.color, color, DEFAULT_PATH_COLOR, id)
+          return color? color as [number, number, number, number] : DEFAULT_PATH_COLOR as [number, number, number, number];
         } else {
           const HEX = getFeatureColor(path, colorModeRef.current, END_COLOR);
           const color = hexToRGB(HEX);

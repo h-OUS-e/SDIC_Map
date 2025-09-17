@@ -73,6 +73,7 @@ export default function MapLocationLabels({
     const labelsLayerIdS = "location-labels-small";
     const labelsLayerIdM = "location-labels-medium";
     const labelsLayerIdOrigin = "location-labels-origin";
+    let fontSizeL = 20
 
     // --- Core Logic for MapLibre Symbol Layer ---
     useEffect(() => {
@@ -150,7 +151,7 @@ export default function MapLocationLabels({
 
 
             // Dynamic font for SDIC Label
-            let fontSizeL = 16
+            
             // if (typeof zoom === "number") {
             //     if (zoom <= 12) fontSizeL = 14;
             //     else if (zoom >= 13) fontSizeL = 16;
@@ -170,7 +171,7 @@ export default function MapLocationLabels({
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
                         "text-font": ["SamsungOne 600"],
-                        "text-size": fontSizeL,
+                        "text-size": ["interpolate", ["linear"], ["zoom"],12,14, 13,18, 14,21, 15,24],
                         "text-anchor": "top",
                         "text-offset": [0, 0.0], // Offset the label slightly below the point
                         "text-allow-overlap": false,

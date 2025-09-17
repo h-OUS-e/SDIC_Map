@@ -47,11 +47,11 @@ export const CLASS_PALETTE = {
   "design_events": "#FF6F91", // Creative coral pink
   "art_exhibit": "#9B5DE5", // Imaginative purple
   "academic_conferences": "#2E7D32", // Scholarly green
-  "networking_dinner": "#C6A700", // Formal golden mustard
-  "local_protests": "#D32F2F",  // Strong activist red
-  "gamer_meetups": "#00C853",  // Neon gamer green
-  "comedy_shows": "#FFB300",  // Fun playful yellow-orange
-  "none": "c0effc"
+  "networking_dinner": "#ccb227", // Formal golden mustard
+  "local_protests": "#e08a34", 
+  "gamer_meetups": "#c2d44e", 
+  "comedy_shows": "#ffd500",  // Fun playful yellow-orange
+  "none": "#c0effc"
 };
 
 export const CLASS_MODES = {
@@ -93,7 +93,7 @@ export function hexToRGB(hex) {
 
 // Build a Mapbox expression like: ["match", ["get", prop], "Team A", "#...", "Team B", "#...", END_COLOR]
 function buildColorExpr(features, mode, fallbackColor, classPalette = CLASS_PALETTE, monthPalette = MONTH_PALETTE) {
-  if (mode === COLOR_MODES.NONE) return fallbackColor;
+  if (mode === COLOR_MODES.NONE) return CLASS_PALETTE.none;
 
   const prop = mode === COLOR_MODES.CLASS ? "class" : "month";
   const domain = Array.from(new Set(features.map(f => f?.properties?.[prop]).filter(Boolean)));
@@ -134,6 +134,25 @@ function parseSemicolonCSV(text) {
         headers.forEach((h, i) => (row[h] = cols[i] ?? ""));
         return row;
     });
+}
+
+function removeAllLayersForSource(map, sourceId) {
+  const style = map.getStyle?.();
+  if (!style?.layers) return;
+  // remove in reverse draw order
+  for (let i = style.layers.length - 1; i >= 0; i--) {
+    const lyr = style.layers[i];
+    if (lyr?.source === sourceId && map.getLayer(lyr.id)) {
+      try { map.removeLayer(lyr.id); } catch {}
+    }
+  }
+}
+
+function safeRemoveSource(map, sourceId) {
+  if (!map?.getSource?.(sourceId)) return;
+  // ensure no layers still reference the source
+  removeAllLayersForSource(map, sourceId);
+  try { map.removeSource(sourceId); } catch {}
 }
 
 // Distance helpers
@@ -408,7 +427,9 @@ export default function RouteLayer({
     fitOnLoad = false,
     routeImportance = "medium",
     showSmoothed = false,
-    colorMode = COLOR_MODES.NONE 
+    colorMode = COLOR_MODES.NONE,
+    endpointModes = ["none", "class", "none"],
+    endpointDelaysSec = [5, 10], // delays between successive modes
 }) {
 
     // React state holding the loaded route GeoJSON (Feature/FeatureCollection).
@@ -418,6 +439,10 @@ export default function RouteLayer({
 
     // State to color end points based on different color modes
     const [colorBy, setColorBy] = useState(COLOR_MODES.NONE);
+    // Endpoint-only color mode (independent from route colors) 
+    const [endpointColorBy, setEndpointColorBy] = useState(COLOR_MODES.NONE);
+    const endpointTimersRef = useRef([]);
+    const endpointFeaturesRef = useRef([]); // cache features used for endpoint source
 
     // CSV State
     const [csvRows, setCsvRows] = useState([]);
@@ -455,6 +480,19 @@ export default function RouteLayer({
             resampleSpacingMeters: 9 // spacing of points in final output
         },
     })
+
+
+    // Build a STABLE key so the effect doesn't restart on every re-render
+    const endpointScheduleKey = useMemo(() => {
+        try {
+            return JSON.stringify({
+            modes: endpointModes,       // e.g. ["none","class","none"]
+            delays: endpointDelaysSec,  // e.g. [5,10]
+            });
+        } catch {
+            return String(Date.now()); // fallback
+        }
+    }, [endpointModes, endpointDelaysSec]);
 
 
     // Load routes json from URL input
@@ -584,6 +622,7 @@ export default function RouteLayer({
             const BASE = feat?.properties?.__base ?? END_COLOR;
 
             const id = `${layerId}-${i}`;
+            
 
             // const outlineId = `${layerId}-${i}-outline`;  // optional outline (under)
 
@@ -721,8 +760,10 @@ export default function RouteLayer({
                 }),
             };
             upsertGeoJSONSource(map, endSrc, endpointFC);
+            // Cache for later paint-only updates
+            endpointFeaturesRef.current = endpointFC.features;
 
-            // Build the color expression once from the features
+            // Build the color expression for endpoints ONLY (timeline-driven)
             const endpointColor = buildColorExpr(endpointFC.features, colorBy, END_COLOR);
 
             // Optional: a small, sharp "core" circle to show the categorical color clearly
@@ -770,27 +811,95 @@ export default function RouteLayer({
         }
 
         return () => {
-            const ids = [
-                `${layerId}-origin-glow1`,
-                `${layerId}-origin-glow2`,
-                `${layerId}-origin-glow3`,
-                `${layerId}-origin-glow4`,
-                `${layerId}-origin-glow5`,
-                `${layerId}-origin-glow6`,
-                `${layerId}-endpoint-glow1`,
-                `${layerId}-endpoint-glow2`,
-                `${layerId}-endpoint-glow3`,
-                `${layerId}-endpoint-glow4`,
-                `${layerId}-endpoint-glow5`,
-                `${layerId}-endpoint-glow6`,
-                `${layerId}-endpoint-hit`,
-                `${layerId}-endpoint-core`
-            ];
-            ids.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) });
-            if (map.getSource(pointSrc)) map.removeSource(pointSrc);
-            if (map.getSource(endSrc))   map.removeSource(endSrc);
+            removeAllLayersForSource(map, pointSrc);
+            removeAllLayersForSource(map, endSrc);
+            safeRemoveSource(map, pointSrc);
+            safeRemoveSource(map, endSrc);
         };
     }, [map, fcIndexed, origin, endpoints, sourceId, layerId, csvIndex, colorBy]);
+
+
+    useEffect(() => {
+        // Clear any previous timers
+        endpointTimersRef.current.forEach(clearTimeout);
+        endpointTimersRef.current = [];
+
+        // Normalize modes
+        const modes = Array.isArray(endpointModes) && endpointModes.length
+            ? endpointModes
+            : [COLOR_MODES.NONE];
+
+        // Normalize delays (accept "5" as well as 5)
+        const rawDelays = Array.isArray(endpointDelaysSec) ? endpointDelaysSec : [];
+        const delaysMs = [];
+        for (let i = 0; i < modes.length - 1; i++) {
+            const n = Number(rawDelays[i]);
+            delaysMs.push(Math.max(0, Number.isFinite(n) ? n * 1000 : 0));
+        }
+
+        // Guardrail: lengths (we’ll still run with whatever we have)
+        if (delaysMs.length !== modes.length - 1) {
+            console.warn(
+            "[RouteLayer] endpointDelaysSec should have length endpointModes.length - 1",
+            { modes, rawDelays }
+            );
+        }
+
+        // Set initial mode immediately
+        setEndpointColorBy(modes[0]);
+
+        // Schedule subsequent switches
+        if (modes.length > 1) {
+            let acc = 0;
+            for (let i = 1; i < modes.length; i++) {
+            acc += delaysMs[i - 1] || 0;
+            const nextMode = modes[i];
+            const id = setTimeout(() => {
+                setEndpointColorBy(nextMode);
+                // optional: console.log("endpointColorBy ->", nextMode, "at", acc, "ms");
+            }, acc);
+            endpointTimersRef.current.push(id);
+            }
+        }
+
+        return () => {
+            endpointTimersRef.current.forEach(clearTimeout);
+            endpointTimersRef.current = [];
+        };
+    }, [endpointScheduleKey]); // <— depends on the *content*, not array identity
+
+    
+    useEffect(() => {
+        if (!map) return;
+        const feats = endpointFeaturesRef.current;
+        if (!feats || feats.length === 0) return;
+
+        // Rebuild the color expression for current mode
+        const endpointColorExpr = buildColorExpr(feats, endpointColorBy, END_COLOR);
+
+        // Update paint on the already-added endpoint layers—in place
+        const ids = [
+            `${layerId}-endpoint-glow1`,
+            `${layerId}-endpoint-glow2`,
+            `${layerId}-endpoint-glow3`,
+            `${layerId}-endpoint-glow4`,
+            `${layerId}-endpoint-core`,
+            `${layerId}-endpoint-hit`,
+            // add more if you created 5/6 glow rings
+        ];
+
+        ids.forEach(id => {
+            if (map.getLayer(id)) {
+                try {
+                    map.setPaintProperty(id, "circle-color", endpointColorExpr);
+                } catch (e) {
+                    console.warn("Failed to set circle-color on", id, e);
+                }
+            }
+        });
+    }, [map, endpointColorBy, layerId]);
+
+
 
 
     // 3b) Show vertices as points (FOR DEBUGGING)

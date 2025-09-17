@@ -1,54 +1,102 @@
 // BillboardLayer.jsx
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 /**
  * Preprocess billboard image to fix orientation and sizing issues
  */
-function preprocessBillboardImage(img) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Set a standard size for all billboards (adjust as needed)
-    const standardWidth = 200;
-    const standardHeight = 300;
-    
-    canvas.width = standardWidth;
-    canvas.height = standardHeight;
-    
-    // Clear canvas with transparent background
-    ctx.clearRect(0, 0, standardWidth, standardHeight);
-    
-    // Calculate scaling to fit image in standard size while maintaining aspect ratio
-    const imgAspect = img.width / img.height;
-    const standardAspect = standardWidth / standardHeight;
-    
-    let drawWidth, drawHeight, offsetX, offsetY;
-    
-    if (imgAspect > standardAspect) {
-        // Image is wider than standard - fit to width
-        drawWidth = standardWidth;
-        drawHeight = standardWidth / imgAspect;
-        offsetX = 0;
-        offsetY = (standardHeight - drawHeight) / 2;
-    } else {
-        // Image is taller than standard - fit to height
-        drawHeight = standardHeight;
-        drawWidth = standardHeight * imgAspect;
-        offsetX = (standardWidth - drawWidth) / 2;
-        offsetY = 0;
-    }
-    
-    // Draw the image centered and scaled
-    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-    
-    // Create a new Image object from the processed canvas
-    const processedImg = new Image();
-    processedImg.src = canvas.toDataURL();
-    
-    return processedImg;
-}
+function preprocessBillboardImage(
+  img,
+  {
+    width = 200,
+    height = 300,
+    cornerRadius = 24,  // fillet radius in px
+    saturation = 0.6,   // 1 = normal, 0 = grayscale
+    background = 'transparent', // or 'rgba(0,0,0,0)'
+  } = {}
+) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
 
+  canvas.width = width;
+  canvas.height = height;
+
+  // optional background fill (keep transparent by default)
+  if (background && background !== 'transparent') {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    ctx.clearRect(0, 0, width, height);
+  }
+
+  // Calculate fit while preserving aspect ratio
+  const imgAspect = img.width / img.height;
+  const boxAspect = width / height;
+
+  let drawWidth, drawHeight, offsetX, offsetY;
+  if (imgAspect > boxAspect) {
+    drawWidth = width;
+    drawHeight = width / imgAspect;
+    offsetX = 0;
+    offsetY = (height - drawHeight) / 2;
+  } else {
+    drawHeight = height;
+    drawWidth = height * imgAspect;
+    offsetX = (width - drawWidth) / 2;
+    offsetY = 0;
+  }
+
+  // Build a rounded-rect path that clips the final image
+  const r = Math.max(0, Math.min(cornerRadius, Math.min(width, height) / 2));
+
+  function roundedRectPath(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  // Clip to rounded rect covering the full card
+  ctx.save();
+  roundedRectPath(0, 0, width, height, r);
+  ctx.clip();
+
+  // Prefer fast CSS filter desaturation if available
+  const supportsFilter = typeof ctx.filter === 'string';
+  if (supportsFilter) {
+    ctx.filter = `saturate(${saturation})`;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    ctx.filter = 'none';
+  } else {
+    // Fallback: draw, then manually reduce saturation
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    // Move each pixel toward its luminance by (1 - saturation)
+    const desat = 1 - Math.max(0, Math.min(saturation, 1));
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      data[i]     = r + (luminance - r) * desat;
+      data[i + 1] = g + (luminance - g) * desat;
+      data[i + 2] = b + (luminance - b) * desat;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  ctx.restore();
+
+  // Export as an Image (preserves transparency for rounded corners)
+  const processedImg = new Image();
+  processedImg.src = canvas.toDataURL('image/png');
+  return processedImg;
+}
 /**
  * BillboardLayer - Displays billboard images at specific coordinates
  * Props:
@@ -119,7 +167,13 @@ export default function BillboardLayer({
                                 if (!map.hasImage(imageId)) {
                                     try {
                                         // Preprocess the image to fix orientation and sizing issues
-                                        const processedImg = preprocessBillboardImage(img);
+                                        const processedImg = preprocessBillboardImage(img, {
+                                            width: 200,
+                                            height: 300,
+                                            cornerRadius: 24, // tweak to taste
+                                            saturation: 0.6,  // lower = less saturated
+                                            // background: 'transparent', // or set a color if you want a card backplate
+                                        });
                                         map.addImage(imageId, processedImg);
                                         resolve();
                                     } catch (addError) {

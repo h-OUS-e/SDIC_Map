@@ -85,6 +85,12 @@ export function TripsOverlayProvider({
   useEffect(() => {
     if (!map) return;
 
+    // log all style layer ids
+    const style = map.getStyle();
+    if (style && style.layers) {
+      console.log("All Mapbox/Maplibre layer IDs:", style.layers.map(l => l.id));
+    }
+
     if (!overlayRef.current) {
       overlayRef.current = new MapboxOverlay({ interleaved: true });
       console.log("Creating single shared MapboxOverlay", overlayRef.current);
@@ -300,7 +306,7 @@ export default function TripsOverlaySeries({
   const createLayer = (nowS: number) => {
     return new TripsLayer<TripDatum>({
       id: id,
-      beforeId: "saved-route-line-endpoint-glow4",
+      beforeId: "saved-route-line-origin-glow6",
       data: layerData,
       opacity,
       currentTime: nowS,

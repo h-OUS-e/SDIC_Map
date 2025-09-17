@@ -24,7 +24,7 @@ const isAutoStart = true;
 // Build your keyframes (same views you had, just as a list):
 const initialView = {
     center: [-122.43609, 37.77169],
-    zoom: 11,
+    zoom: 11.0, 
     bearing: 0,
     pitch: 0,
     duration: 200,
@@ -56,7 +56,7 @@ const sfView3 = {
 };
 const bayAreaView = {
     center: [-122.27463, 37.61096],
-    zoom: 10.25,
+    zoom: 10.0,
     bearing: 0,
     pitch: 0,
     duration: 8000,
@@ -64,7 +64,7 @@ const bayAreaView = {
 };
 const bayAreaViewPause = {
     center: [-122.27463, 37.61096],
-    zoom: 10.25,
+    zoom: 10.0,
     bearing: 0,
     pitch: 0,
     duration: 4000,
@@ -99,6 +99,7 @@ const billboard3 = {
 const lastView = {
   ...bayAreaView,
   duration: 4000, // overrides the original duration
+  zoom: 10.7,
   easing: easingFunctions.easeInOut,
 };
 
@@ -462,9 +463,11 @@ export default function Map() {
                         onData={handleGeojson} 
                         fitOnLoad={false} 
                         showSmoothed={showSmoothed}  
-                        colorMode={colorMode}
+                        colorMode={COLOR_MODES.NONE}
                         sourceId={sourceId}
                         layerId={layerId}
+                        endpointModes={[COLOR_MODES.NONE, COLOR_MODES.CLASS, COLOR_MODES.NONE, COLOR_MODES.CLASS]}
+                        endpointDelaysSec={[15.7, 13, 10]} // after 5s switch to CLASS, after 10s switch back to NONE
                     />
 
                     {map.current && geoJSON && geoJSON.features && Object.keys(geoJSON.features).length > 0 && (
@@ -638,7 +641,7 @@ export default function Map() {
                                     opacity={.3}
                                     lineWidth={2}
                                     loopDelay={80}
-                                    timeSpeedProfile={{ speeds: [0, 0, 25000, 5000], dts: [30, 6, 6] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 25000, 200000], dts: [28, 2, 6] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
@@ -709,6 +712,22 @@ export default function Map() {
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"none"}
                                 />  
+
+                                <TripsOverlaySeries
+                                    id={"trips-overlay4.4"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={1}
+                                    opacity={.1}
+                                    lineWidth={4}
+                                    loopDelay={80}
+                                    timeSpeedProfile={{ speeds: [0, 0, 100000, 4000, 500000], dts: [52, 1, 2, 1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"none"}
+                                />  
                                 
                                 
                         </TripsOverlayProvider>
@@ -730,8 +749,6 @@ export default function Map() {
                             map={map.current}
                             sourceIdOrigin={`${sourceId}-origin-point`}
                             sourceIdEnd={`${sourceId}-endpoint-point`}
-                            minZoomM={13}
-                            maxZoomM={15}
                             showOriginLabel={true}
                             filterEvents={[
                                 "Built on Bedrock Demo Night",

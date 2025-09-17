@@ -4,42 +4,50 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 
-const font_style = {
-  "version": 8,
-  "name": "Custom Samsung Style",
-  "glyphs": "/fonts/glyphs/{fontstack}/{range}.pbf",
-  "sources": {
-    "osm": {
-      "type": "vector",
-      "url": "https://demotiles.maplibre.org/tiles/tiles.json"
-    }
-  },
-  "layers": [
-    {
-      "id": "background",
-      "type": "background",
-      "paint": {
-        "background-color": "#000000"
-      }
-    },
-    {
-      "id": "city-labels",
-      "type": "symbol",
-      "source": "osm",
-      "source-layer": "place_label",
-      "layout": {
-        "text-field": "{name}",
-        "text-font": ["SamsungSharpSans Regular"],
-        "text-size": 14
+function addLatLngLabel(map, id, lng, lat, labelText = null) {
+  const label = labelText || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  // If layer exists, just update the source data
+  const sourceData = {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [lng, lat] },
+        properties: { label },
       },
-      "paint": {
+    ],
+  };
+
+  if (map.getSource(id)) {
+    map.getSource(id).setData(sourceData);
+  } else {
+    map.addSource(id, { type: "geojson", data: sourceData });
+  }
+
+  if (!map.getLayer(`${id}-largeIcons`)) {
+    map.addLayer({
+      id: `${id}-largeIcons`,
+      type: "symbol",
+      source: id,
+      minzoom: 10,
+      maxzoom: 10.25,
+      layout: {
+        "text-field": ["get", "label"],
+        // Use a font that exists in your style; if Samsung fonts aren't loaded, use a default:
+        "text-font": ["Samsung Sharp Sans Bold"], // or ["Open Sans Bold"]
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10,18,12,16, 13,18, 14,21, 15,24],
+        "text-anchor": "top",
+      },
+      paint: {
         "text-color": "#ffffff",
-        "text-halo-color": "#000000",
-        "text-halo-width": 2
-      }
-    }
-  ]
+        "text-halo-color": "rgba(0,0,0,0.85)",
+        "text-halo-width": 1,
+      },
+    });
+  }
 }
+
 
 /**
  * REFACTORED PROPS:
@@ -58,22 +66,22 @@ export default function MapLocationLabels({
     minZoomL = 10,
     maxZoomL = 18,
     minZoomM = 13,
-    maxZoomM = 18,
-    minZoomS = 14.40,
+    maxZoomM = 16,
+    minZoomS = 13.50,
     maxZoomS = 18,
     filterEvents = null,
-    showOriginLabel = true,
+    // showOriginLabel = true,
 }) {
     // --- State for the separate, DOM-based SDIC label ---
-    const [container, setContainer] = useState(null);
-    const [zoom, setZoom] = useState(null);
-    const [sdicPosition, setSdicPosition] = useState(null);
-    const SDIC_ORIGIN = [-122.40109460000001, 37.7981955];
-    const shouldShowSDICLabel = zoom !== null && zoom >= 10 && showOriginLabel;
+    // const [container, setContainer] = useState(null);
+    // const [zoom, setZoom] = useState(null);
+    // const [sdicPosition, setSdicPosition] = useState(null);
+    // const SDIC_ORIGIN = [-122.40109460000001, 37.7981955];
+    // const shouldShowSDICLabel = zoom !== null && zoom >= 10 && showOriginLabel;
     const labelsLayerIdS = "location-labels-small";
     const labelsLayerIdM = "location-labels-medium";
     const labelsLayerIdOrigin = "location-labels-origin";
-    let fontSizeL = 20
+    // let fontSizeL = 20
 
     // --- Core Logic for MapLibre Symbol Layer ---
     useEffect(() => {
@@ -107,7 +115,7 @@ export default function MapLocationLabels({
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
                         // "text-font": ["SamsungOne 300"],
-                        "text-size": 9,
+                        "text-size":9,
                         "text-anchor": "top",
                         "text-offset": [0, 0.8], // Offset the label slightly below the point
                         "text-allow-overlap": false,
@@ -115,7 +123,7 @@ export default function MapLocationLabels({
                     },
                     paint: {
                         "text-color": "#ffffff",
-                        "text-halo-color": "rgba(0, 0, 0, 0.85)", // Adds a dark outline for readability
+                        "text-halo-color": "rgba(255,255,255, 0.05)", // Adds a dark outline for readability
                         "text-halo-width": 1,
                         "text-halo-blur": 1,
                     },
@@ -173,7 +181,7 @@ export default function MapLocationLabels({
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
                         "text-font": ["Samsung Sharp Sans Bold"],
-                        "text-size": ["interpolate", ["linear"], ["zoom"],12,14, 13,18, 14,21, 15,24],
+                        "text-size": ["interpolate", ["linear"], ["zoom"],10,20, 12,18, 13,21, 14,24, 15,28],
                         "text-anchor": "top",
                         "text-offset": [0, 0.0], // Offset the label slightly below the point
                         "text-allow-overlap": false,
@@ -187,6 +195,11 @@ export default function MapLocationLabels({
                     },
                 });
             }
+
+            // Adding Berkley and palo alto and others large icons            
+            addLatLngLabel(map, "point2", -122.16695, 37.42411, "Stanford University"); // custom label
+            addLatLngLabel(map, "point3", -122.25948, 37.8721, "Berkley University"); // custom label
+            addLatLngLabel(map, "point4", -121.977, 37.3875, "Silicon Valley"); // custom label
         };
 
         addLayerWhenReady();
@@ -220,24 +233,24 @@ export default function MapLocationLabels({
     }, [map, filterEvents]);
 
 
-    // --- Logic for the separate SDIC label (which still uses the DOM) ---
-    useEffect(() => {
-        if (!map) return;
-        setContainer(map.getContainer());
-        const updateZoom = () => setZoom(map.getZoom());
-        const updatePosition = () => setSdicPosition(map.project(SDIC_ORIGIN));
+    // // --- Logic for the separate SDIC label (which still uses the DOM) ---
+    // useEffect(() => {
+    //     if (!map) return;
+    //     setContainer(map.getContainer());
+    //     const updateZoom = () => setZoom(map.getZoom());
+    //     const updatePosition = () => setSdicPosition(map.project(SDIC_ORIGIN));
         
-        map.on('zoom', updateZoom);
-        map.on('move', updatePosition);
+    //     map.on('zoom', updateZoom);
+    //     map.on('move', updatePosition);
         
-        updateZoom();
-        updatePosition();
+    //     updateZoom();
+    //     updatePosition();
 
-        return () => {
-            map.off('zoom', updateZoom);
-            map.off('move', updatePosition);
-        };
-    }, [map]);
+    //     return () => {
+    //         map.off('zoom', updateZoom);
+    //         map.off('move', updatePosition);
+    //     };
+    // }, [map]);
 
     // const getSDICLabelStyle = () => {
     //     let fontSize = 12;

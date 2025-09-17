@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { COLOR_MODES } from "./RouteLayer";
 
 export default function KeyframeControls({
@@ -28,6 +28,9 @@ export default function KeyframeControls({
 
   const [isHidden, setIsHidden] = React.useState(true);
   const [localColorMode, setLocalColorMode] = useState(colorMode);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+
 
   // Frosted glass panel
   const panelStyle = {
@@ -185,6 +188,35 @@ export default function KeyframeControls({
   };
 
 
+  const fmtTime = (ms) => {
+    const total = Math.floor(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  // run the timer only while "playing" and not "paused"
+  useEffect(() => {
+    if (isPlaying && !isPaused) {
+      let last = Date.now();
+      const id = setInterval(() => {
+        const now = Date.now();
+        setElapsedMs((prev) => prev + (now - last));
+        last = now;
+      }, 250); // smooth-ish updates without being too chatty
+      return () => clearInterval(id);
+    }
+    // if not playing or is paused, do nothing (interval cleared)
+    return undefined;
+  }, [isPlaying, isPaused]);
+
+  // reset helper (so the Reset button clears the timer too)
+  const handleReset = () => {
+    setElapsedMs(0);
+    onReset && onReset();
+  };
+
+
   
 
   if (isHidden) {
@@ -305,7 +337,7 @@ export default function KeyframeControls({
         </button>
 
         <button
-          onClick={onReset}
+          onClick={handleReset}
           title="Reset"
           aria-label="Reset camera"
           style={withHover(iconBtn, iconBtnHover)}
@@ -316,6 +348,21 @@ export default function KeyframeControls({
 
       <div style={{ fontSize: 11, opacity: 0.75, marginTop: 10 }}>
         {isAutoPlaying ? "Auto-playing…" : "Manual control"}
+      </div>
+
+      {/* Timer display */}
+      <div style={{
+        marginTop: 6,
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.18)",
+        borderRadius: 8,
+        padding: "6px 10px",
+        display: "inline-block"
+      }}>
+        ⏱ {fmtTime(elapsedMs)}
       </div>
 
 

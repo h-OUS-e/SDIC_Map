@@ -18,11 +18,11 @@ const MINT_GREEN = "#00FF93"
 const DARK_GREEN = "#138B4F"
 
 // Parameters
-const CRAYON_WIDTH = 8
-const CRAYON_OPACITY = .2
-const START_COLOR = "#98bffa";
-const MID_COLOR = "#3b59cc";
-export const END_COLOR = "#c0effc"; // 8b60f7
+const CRAYON_WIDTH = 4
+const CRAYON_OPACITY = .7
+const START_COLOR = "#162357" //"#98bffa";
+const MID_COLOR = "#162357" // "#3b59cc";
+export const END_COLOR = "#162357"// "#c0effc";  8b60f7
 const head_t = 100;
 const tail_t = 100;
 const inner_head_t = 1000;
@@ -42,7 +42,7 @@ export const MONTH_PALETTE = {
 // Represets colo r code for different event types
 export const CLASS_PALETTE = {
   "tech_meetups": "#2D9CDB", // Energetic tech blue
-  "tech_summit": "#1B4965", // Deep professional teal
+  "tech_summit": "#4e8c91", // torqouise
   "startup_pitches": "#00BFA6", // Bold hopeful teal
   "design_events": "#FF6F91", // Creative coral pink
   "art_exhibit": "#9B5DE5", // Imaginative purple

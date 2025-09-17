@@ -369,6 +369,7 @@ export default function Map() {
 
         // Use the initial SF view when the map loads
         const initialState = initialView;
+        
 
         map.current = new maplibregl.Map({
             container: mapContainer.current,
@@ -518,30 +519,67 @@ export default function Map() {
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"none"}
+
                                 />
 
     
-                                {/* Showing Art events */}
+                                {/* Showing design events */}
                                 <TripsOverlaySeries
-                                    id={"trips-overlay2.1"}
+                                    id={"trips-overlay2.1.1"}
                                     map={map.current}
                                     geoJSON={geoJSON}
                                     fps={30}
-                                    trail={2}
-                                    opacity={.5}
+                                    trail={1.5}
+                                    opacity={1}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 2000, 10], dts: [15.2, 3, 1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [14.6, 2, 1,.1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.design_events, CLASS_MODES.art_exhibit]}
+                                    classFilters={[CLASS_MODES.design_events]}
                                 />  
+
+                                {/* Showing art exhibit events */}
+                                <TripsOverlaySeries
+                                    id={"trips-overlay2.1.2"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={2}
+                                    opacity={1}
+                                    lineWidth={4}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [16, 2, 1,.1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                    classFilters={[CLASS_MODES.art_exhibit]}
+                                /> 
+
+                                {/* Showing art exhibit events */}
+                                <TripsOverlaySeries
+                                    id={"trips-overlay2.1.3"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={2}
+                                    opacity={1}
+                                    lineWidth={4}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [17.4, 2, 1,.1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                    classFilters={[CLASS_MODES.academic_conferences]}
+                                /> 
 
                                 {/* Showing Tech Events */}
                                 <TripsOverlaySeries
-                                    id={"trips-overlay2.2"}
+                                    id={"trips-overlay2.2.1"}
                                     map={map.current}
                                     geoJSON={geoJSON}
                                     fps={30}
@@ -549,15 +587,49 @@ export default function Map() {
                                     opacity={.7}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 2000, 10], dts: [17.2, 3, 1] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [18.8, 2, 1,.1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.tech_meetups, CLASS_MODES.tech_summit, CLASS_MODES.startup_pitches]}
+                                    classFilters={[CLASS_MODES.tech_meetups]}
                                 /> 
 
-                                {/* Showing networking events and more niche items like comedy show or protests */}
+                                <TripsOverlaySeries
+                                    id={"trips-overlay2.2.2"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={2}
+                                    opacity={.7}
+                                    lineWidth={4}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [20.2, 2, 1,.1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                    classFilters={[CLASS_MODES.startup_pitches]}
+                                /> 
+
+                                <TripsOverlaySeries
+                                    id={"trips-overlay2.2.3"}
+                                    map={map.current}
+                                    geoJSON={geoJSON}
+                                    fps={30}
+                                    trail={2}
+                                    opacity={.7}
+                                    lineWidth={4}
+                                    // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [21.6, 2, 1,.1] }}
+                                    playState={status}
+                                    reset={resetTripsOverlay}
+                                    onReset = {() =>{setResetTripsOverlay(false)}}
+                                    colorMode = {"class"}
+                                    classFilters={[CLASS_MODES.tech_summit]}
+                                /> 
+
+                                {/* Showing other niche events under the banner of "social and cultural" events */}
                                 <TripsOverlaySeries
                                     id={"trips-overlay2.3"}
                                     map={map.current}
@@ -567,15 +639,15 @@ export default function Map() {
                                     opacity={.7}
                                     lineWidth={4}
                                     // if you have 4 speeds, you need 3 dts. dts are in seconds and define how long it takes to go from s1 to s2
-                                    timeSpeedProfile={{ speeds: [0, 0, 2000, 1000], dts: [19.2, 3, 2] }}
+                                    timeSpeedProfile={{ speeds: [0, 0, 5000, 500, 500000], dts: [23, 2, 1,.1] }}
                                     playState={status}
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                    classFilters={[CLASS_MODES.academic_conferences, CLASS_MODES.networking_dinner, CLASS_MODES.local_protests, CLASS_MODES.gamer_meetups, CLASS_MODES.comedy_shows]}
+                                    classFilters={[CLASS_MODES.networking_dinner, CLASS_MODES.local_protests, CLASS_MODES.gamer_meetups, CLASS_MODES.comedy_shows]}
                                 /> 
                                 {/* Showing all classes at once */}
-                                <TripsOverlaySeries
+                                {/* <TripsOverlaySeries
                                     id={"trips-overlay2.4"}
                                     map={map.current}
                                     geoJSON={geoJSON}
@@ -589,7 +661,7 @@ export default function Map() {
                                     reset={resetTripsOverlay}
                                     onReset = {() =>{setResetTripsOverlay(false)}}
                                     colorMode = {"class"}
-                                /> 
+                                />  */}
 
                                 {/* Single visual burst of all roads without class type */}
                                 <TripsOverlaySeries

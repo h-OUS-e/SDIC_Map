@@ -3,6 +3,44 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+
+const font_style = {
+  "version": 8,
+  "name": "Custom Samsung Style",
+  "glyphs": "/fonts/glyphs/{fontstack}/{range}.pbf",
+  "sources": {
+    "osm": {
+      "type": "vector",
+      "url": "https://demotiles.maplibre.org/tiles/tiles.json"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#000000"
+      }
+    },
+    {
+      "id": "city-labels",
+      "type": "symbol",
+      "source": "osm",
+      "source-layer": "place_label",
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["SamsungSharpSans Regular"],
+        "text-size": 14
+      },
+      "paint": {
+        "text-color": "#ffffff",
+        "text-halo-color": "#000000",
+        "text-halo-width": 2
+      }
+    }
+  ]
+}
+
 /**
  * REFACTORED PROPS:
  * - map: maplibregl.Map (required)
@@ -65,7 +103,7 @@ export default function MapLocationLabels({
                         "text-field": ["get", "location_name"],
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
-                        "text-font": ["Open Sans Regular"],
+                        "text-font": ["SamsungOne 300"],
                         "text-size": 11,
                         "text-anchor": "top",
                         "text-offset": [0, 0.8], // Offset the label slightly below the point
@@ -131,7 +169,7 @@ export default function MapLocationLabels({
                         "text-field": "SDIC",
                         // Note: Custom fonts like 'SamsungSharpSans' need to be loaded into the map style itself.
                         // We'll use a standard font available in most MapTiler styles for robustness.
-                        "text-font": ["Open Sans Regular"],
+                        "text-font": ["SamsungOne 600"],
                         "text-size": fontSizeL,
                         "text-anchor": "top",
                         "text-offset": [0, 0.0], // Offset the label slightly below the point

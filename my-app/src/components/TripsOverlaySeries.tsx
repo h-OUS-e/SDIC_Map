@@ -3,7 +3,7 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Layer, LayersList } from "deck.gl";
 import type maplibregl from "maplibre-gl";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { FC, haversineMeters, toTripsData } from "../utils/prepareTrips";
+import { FC, haversineMeters, toTripsData, TripDatum } from "../utils/prepareTrips";
 import { CLASS_MODES, COLOR_MODES, END_COLOR, getFeatureColor, hexToRGB } from './RouteLayer';
 
 
@@ -13,12 +13,12 @@ export type TripClass = typeof CLASS_MODES[keyof typeof CLASS_MODES];
 export const CLASS_LIST: TripClass[] = Object.values(CLASS_MODES);
 
 
-export type TripDatum = {
-  path: [number, number][];
-  timestamps: number[];
-  color?: [number, number, number];
-  class?: TripClass[];
-};
+// export type TripDatum = {
+//   path: [number, number][];
+//   timestamps: number[];
+//   color?: [number, number, number];
+//   class?: TripClass[];
+// };
 
 type colorModeProp = "usePathColor" | "none" | "class" | "months"
 
@@ -44,7 +44,7 @@ export type Props = {
   reset: boolean; 
   colorMode: colorModeProp;
   onReset: ()=>void;
-  classFilters?: TripClass[][]; // e.g. ["bus","tram"]
+  classFilters?: TripClass[]; // e.g. ["bus","tram"]
 };
 
 // Context type definition
@@ -56,7 +56,7 @@ type TripsOverlayContextType = {
   map: maplibregl.Map | null;
 };
 
-function matchesClassFilters(classes: string[] | undefined, filters?: string[]): boolean {
+function matchesClassFilters(classes: string | undefined, filters?: string[]): boolean {
 
   if (!filters || filters.length === 0) return true;           // no filters → show all
   if (!classes || classes.length === 0) return false;          // trip has no classes → hide
@@ -197,10 +197,11 @@ export default function TripsOverlaySeries({
   const data: TripDatum[] = toTripsData(geoJSON, timeSpeedProfile);
 
   const filteredData = useMemo(
-    () => data.filter(d => matchesClassFilters(d.class, classFilters)),
-    [data, classFilters]
-  );
+    () => data.filter(d =>
+        matchesClassFilters(d.class, classFilters)
+  ),[data, classFilters]);
 
+  
   // Layer data
   const layerData = useMemo(() => filteredData, [filteredData]);
 
@@ -323,7 +324,9 @@ export default function TripsOverlaySeries({
   };
 
   useEffect(() => {
-}, [data, filteredData, classFilters]);
+  }, [data, filteredData, classFilters]);
+
+
   // Register this layer with the context (or create own overlay if no context)
   useEffect(() => {
     if (context?.isReady) {
@@ -452,7 +455,7 @@ export default function TripsOverlaySeries({
       if (trip) {
         const vApprox = approxSpeedFromTrip(trip, t);
         if (vApprox != null && Number.isFinite(vApprox)) {
-          console.log(`${id} t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
+          // console.log(`${id} t=${t.toFixed(2)}s approxSpeed=${vApprox.toFixed(2)} m/s`);
         }
       }
 

@@ -1,6 +1,11 @@
-import { data } from "@maptiler/sdk/dist/src";
 import type * as GeoJSON from "geojson";
+import { CLASS_MODES } from '../components/RouteLayer';
 
+
+
+// Getting a list of classes from CLASS_MODES
+export type TripClass = typeof CLASS_MODES[keyof typeof CLASS_MODES];
+export const CLASS_LIST: TripClass[] = Object.values(CLASS_MODES);
 
 export type TripDatum = {
   path: [number, number][]
@@ -8,7 +13,7 @@ export type TripDatum = {
   color?: [number, number, number]
   team?: string
   month?: string
-  class?: string
+  class?: TripClass
   from?: string
   to?: string
 }
